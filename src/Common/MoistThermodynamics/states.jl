@@ -289,9 +289,7 @@ that are tested for convergence in saturation adjustment.
 Note that the output vectors are of size ``n*n_RH``, and they
 should span the input arguments to all of the constructors.
 """
-function tested_convergence_range(FT, n)
-  n_RS1 = 10
-  n_RS2 = 20
+function tested_convergence_range(n, n_RS1, n_RS2, FT)
   n_RS = n_RS1+n_RS2
   z_range  = range(FT(0), stop=FT(2.5e4), length=n)
   relative_sat1 = range(FT(0), stop=FT(1), length=n_RS1)

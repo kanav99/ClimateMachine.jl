@@ -2,6 +2,7 @@ using Pkg
 
 using Test
 using CLIMA.MoistThermodynamics
+MT = MoistThermodynamics
 
 using CLIMA.PlanetParameters
 using CLIMA.RootSolvers
@@ -11,24 +12,19 @@ using Plots
 @testset "moist thermodynamics - bounds" begin
 
   FT = Float64
-  q_tot_range = range(0, stop=10^(-1), step=10^(-2))
-  ρ_range     = range(1e-3, stop=1.6, step=10^(-1))
-  e_int_range = range(-1e5, stop=1e5, step=10^(3))
-  q_tot_dim = length(q_tot_range)
-  ρ_dim     = length(ρ_range)
-  e_int_dim = length(e_int_range)
-  @show q_tot_dim, ρ_dim, e_int_dim
+  e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = MT.tested_convergence_range(3, 2, 2, FT)
 
-  TS = Array{ThermodynamicState}(undef, (q_tot_dim, ρ_dim, e_int_dim))
-  SOL = Array{RootSolvers.VerboseSolutionResults}(undef, (q_tot_dim, ρ_dim, e_int_dim))
-  maxiter = 10
-  tol = 1e-3
+  domain_dim = (length(q_tot), length(ρ), length(e_int));
 
-  for (i,q_tot) in enumerate(q_tot_range)
-  for (j,ρ) in enumerate(ρ_range)
-  for (k,e_int) in enumerate(e_int_range)
-    ts_eq, sol  = PhaseEquil(e_int, q_tot, ρ, maxiter, tol)
-    ts_eq, sol  = PhaseEquil_NewtonMethod(e_int, q_tot, ρ, maxiter, tol)
+  TS = Array{ThermodynamicState}(undef, domain_dim)
+  SOL = Array{RootSolvers.VerboseSolutionResults}(undef, domain_dim)
+  maxiter = 100
+  tol = 1e-1
+
+  for (i,e_int_) in enumerate(e_int)
+  for (j,ρ_) in enumerate(ρ)
+  for (k,q_tot_) in enumerate(q_tot)
+    ts_eq, sol, sa_called  = PhaseEquil(e_int_, ρ_, q_tot_, maxiter, tol, MT.saturation_adjustment_SecantMethod)
     TS[i,j,k] = ts_eq
     SOL[i,j,k] = sol
   end
@@ -54,21 +50,25 @@ using Plots
   mkpath("output")
   mkpath(joinpath("output","MoistThermoAnalysis"))
   dir = joinpath("output","MoistThermoAnalysis")
+  Z = Array{FT}(map(x->x.converged, SOL[1,:,:]))
+  @show size(Z)
+  @show size(e_int)
+  @show size(ρ)
 
-  contourf(e_int_range, ρ_range    , map(x->x.converged, SOL[1,:,:]), color=:viridis, xlabel="e_int", ylabel="ρ")
-  savefig(joinpath(dir,"converged1.png"))
-  contourf(q_tot_range, e_int_range, map(x->x.converged, SOL[:,1,:]), color=:viridis, xlabel="q_tot", ylabel="e_int")
-  savefig(joinpath(dir,"converged2.png"))
-  contourf(q_tot_range, ρ_range    , map(x->x.converged, SOL[:,:,1]), color=:viridis, xlabel="q_tot", ylabel="ρ")
-  savefig(joinpath(dir,"converged3.png"))
+  contourf(e_int, ρ    , Z, color=:viridis, xlabel="e_int", ylabel="ρ")
+  savefig(joinpath(dir,"convergedPlaneOne.png"))
+  # contourf(q_tot, e_int, Array{FT}(map(x->x.converged, SOL[:,1,:])), color=:viridis, xlabel="q_tot", ylabel="e_int")
+  # savefig(joinpath(dir,"converged2.png"))
+  # contourf(q_tot, ρ    , Array{FT}(map(x->x.converged, SOL[:,:,1])), color=:viridis, xlabel="q_tot", ylabel="ρ")
+  # savefig(joinpath(dir,"converged3.png"))
 
   fun(ts) = air_pressure(ts)
   fun(ts) = air_temperature(ts)
   fun(ts) = PhasePartition(ts).liq
 
-  contourf(e_int_range, ρ_range    , map(x->fun(x), TS[1,:,:]), color=:viridis, xlabel="e_int", ylabel="ρ")
-  contourf(q_tot_range, e_int_range, map(x->fun(x), TS[:,1,:]), color=:viridis, xlabel="q_tot", ylabel="e_int")
-  contourf(q_tot_range, ρ_range    , map(x->fun(x), TS[:,:,1]), color=:viridis, xlabel="q_tot", ylabel="ρ")
+  # contourf(e_int, ρ    , Array{FT}(map(x->fun(x), TS[1,:,:])), color=:viridis, xlabel="e_int", ylabel="ρ")
+  # contourf(q_tot, e_int, map(x->fun(x), TS[:,1,:]), color=:viridis, xlabel="q_tot", ylabel="e_int")
+  # contourf(q_tot, ρ    , map(x->fun(x), TS[:,:,1]), color=:viridis, xlabel="q_tot", ylabel="ρ")
 
 
 end
