@@ -22,7 +22,6 @@ using CLIMA.Mesh.Grids
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.DGBalanceLawDiscretizations.NumericalFluxes
 using CLIMA.MPIStateArrays
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using CLIMA.VTK
@@ -34,8 +33,6 @@ using Printf
 using CLIMA.PlanetParameters
 using CLIMA.MoistThermodynamics
 using CLIMA.Microphysics
-
-const ArrayType = CLIMA.array_type()
 
 const _nstate = 5
 const _ρ, _ρu, _ρw, _ρe_tot, _ρq_tot = 1:_nstate
@@ -289,6 +286,7 @@ end
 function run(dim, Ne, N, timeend, FT)
 
   CLIMA.init()
+  ArrayType = CLIMA.array_type()
 
   mpicomm = MPI.COMM_WORLD
 

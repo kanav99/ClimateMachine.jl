@@ -22,7 +22,6 @@ using CLIMA.Mesh.Grids
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.DGBalanceLawDiscretizations.NumericalFluxes
 using CLIMA.MPIStateArrays
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using CLIMA.VTK
@@ -34,8 +33,6 @@ using Printf
 using CLIMA.PlanetParameters
 using CLIMA.MoistThermodynamics
 using CLIMA.Microphysics
-
-const ArrayType = CLIMA.array_type()
 
 const _nstate = 7
 const _ρ, _ρu, _ρw, _ρe_tot, _ρq_tot, _ρq_liq, _ρq_rai = 1:_nstate
@@ -131,7 +128,7 @@ end
 
 
 # time tendencies
-@inline function source!(S, Q, aux, t)
+@inline function source!(S, Q, diffusive, aux, t)
   FT = eltype(Q)
   u, w, rain_w, ρ, q_tot, q_liq, q_rai, e_tot = preflux(Q)
   @inbounds begin
@@ -375,6 +372,8 @@ end
 function run(dim, Ne, N, timeend, FT)
 
   CLIMA.init()
+  ArrayType = CLIMA.array_type()
+
   mpicomm = MPI.COMM_WORLD
 
   brickrange = ntuple(j->range(FT(0); length=Ne[j]+1, stop=Z_max), 2)

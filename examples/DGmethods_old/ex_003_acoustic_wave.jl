@@ -44,7 +44,6 @@ using CLIMA.Mesh.Grids
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.DGBalanceLawDiscretizations.NumericalFluxes
 using CLIMA.VTK
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 
@@ -53,10 +52,6 @@ using CLIMA.GenericCallbacks
 using CLIMA.PlanetParameters: planet_radius, grav, MSLP
 using CLIMA.MoistThermodynamics: air_temperature, air_pressure, internal_energy,
                                  soundspeed_air, air_density, gas_constant_air
-
-# Start up MPI and determine array type
-const DeviceArrayType = CLIMA.array_type()
-#md nothing # hide
 
 # Specify whether to enforce hydrostatic balance at PDE level or not
 const PDE_level_hydrostatic_balance = true
@@ -130,7 +125,7 @@ end
 #md nothing # hide
 
 # Define the geopotential source from the solution and auxiliary variables
-function geopotential!(S, Q, aux, t)
+function geopotential!(S, Q, diffusive, aux, t)
   @inbounds begin
     ρ_ref, ϕx, ϕy, ϕz = aux[_a_ρ_ref], aux[_a_ϕx], aux[_a_ϕy], aux[_a_ϕz]
     dρ = Q[_dρ]
@@ -393,6 +388,8 @@ end
 # required for stable long time simulation.
 let
   CLIMA.init()
+  DeviceArrayType = CLIMA.array_type()
+
   mpicomm = MPI.COMM_WORLD
   mpi_logger = ConsoleLogger(MPI.Comm_rank(mpicomm) == 0 ? stderr : devnull)
 

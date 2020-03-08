@@ -2,15 +2,12 @@ using MPI
 using CLIMA
 using CLIMA.Mesh.Topologies
 using CLIMA.Mesh.Grids
-using CLIMA.Mesh.Grids: VerticalDirection, HorizontalDirection, EveryDirection
 using CLIMA.Mesh.Filters
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.MPIStateArrays
 using Printf
 using LinearAlgebra
 using Logging
-
-const ArrayTypes = (CLIMA.array_type(),)
 
 using Test
 function run(mpicomm, dim, ArrayType, Ne, FT)
@@ -87,6 +84,8 @@ end
 
 let
   CLIMA.init()
+  ArrayTypes = (CLIMA.array_type(),)
+
   mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = ll == "DEBUG" ? Logging.Debug :

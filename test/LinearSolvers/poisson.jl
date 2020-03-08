@@ -16,14 +16,12 @@ using CLIMA.DGmethods
 import CLIMA.DGmethods: BalanceLaw, vars_aux, vars_state, vars_gradient,
                         vars_diffusive, flux_nondiffusive!, flux_diffusive!,
                         source!, boundary_state!,
-                        gradvariables!,
+                        numerical_boundary_flux_diffusive!, gradvariables!,
                         diffusive!, init_aux!, init_state!,
                         LocalGeometry
 
 import CLIMA.DGmethods.NumericalFluxes: NumericalFluxDiffusive,
                                         numerical_flux_diffusive!
-                                                              
-const ArrayType = CLIMA.array_type()
 
 if !@isdefined integration_testing
   const integration_testing =
@@ -45,27 +43,27 @@ function flux_nondiffusive!(::PoissonModel, flux::Grad, state::Vars,
 end
 
 function flux_diffusive!(::PoissonModel, flux::Grad, state::Vars,
-                         diffusive::Vars, auxstate::Vars, t::Real)
+                         diffusive::Vars, hyperdiffusive::Vars, auxstate::Vars, t::Real)
   flux.ϕ = diffusive.∇ϕ
 end
 
 struct PenaltyNumFluxDiffusive <: NumericalFluxDiffusive end
+
+# There is no boundary since we are periodic
+numerical_boundary_flux_diffusive!(nf::PenaltyNumFluxDiffusive, _...) = nothing
+
 function numerical_flux_diffusive!(::PenaltyNumFluxDiffusive,
-                                   bl::PoissonModel, F::MArray, nM,
-                                   QM, QVM, auxM,
-                                   QP, QVP, auxP,
-                                   t)
+    bl::PoissonModel, fluxᵀn::Vars{S}, n::SVector,
+    state⁻::Vars{S}, diff⁻::Vars{D}, hyperdiff⁻::Vars{HD}, aux⁻::Vars{A},
+    state⁺::Vars{S}, diff⁺::Vars{D}, hyperdiff⁺::Vars{HD}, aux⁺::Vars{A}, t) where {S,HD,D,A}
+
   numerical_flux_diffusive!(CentralNumericalFluxDiffusive(),
-                            bl, F, nM,
-                            QM, QVM, auxM,
-                            QP, QVP, auxP,
-                            t)
-  FT = eltype(F)
-  nstate = length(F)
-  tau = FT(1.0)
-  for s = 1:nstate
-    @inbounds F[s] -= tau * (QM[1] - QP[1])
-  end
+    bl, fluxᵀn, n, state⁻, diff⁻, hyperdiff⁻, aux⁻, state⁺, diff⁺, hyperdiff⁺, aux⁺, t)
+
+  Fᵀn = parent(fluxᵀn)
+  FT = eltype(Fᵀn)
+  tau = FT(1)
+  Fᵀn .-= tau*(parent(state⁻) - parent(state⁺))
 end
 
 function gradvariables!(::PoissonModel, transformstate::Vars, state::Vars, auxstate::Vars, t::Real)
@@ -77,7 +75,7 @@ function diffusive!(::PoissonModel, diffusive::Vars,
   diffusive.∇ϕ = ∇transform.ϕ
 end
 
-source!(::PoissonModel, source::Vars, state::Vars, aux::Vars, t::Real) = nothing
+source!(::PoissonModel, source::Vars, state::Vars, diffusive::Vars, aux::Vars, t::Real) = nothing
 
 # note, that the code assumes solutions with zero mean
 sol1d(x) = sin(2pi * x) ^ 4 - 3 / 8
@@ -105,12 +103,12 @@ function run(mpicomm, ArrayType, FT, dim, polynomialorder, brickrange, periodici
                                           polynomialorder = polynomialorder,
                                           DeviceArray = ArrayType,
                                           FloatType = FT)
-  
+
   dg = DGModel(PoissonModel{dim}(),
                grid,
                CentralNumericalFluxNonDiffusive(),
                PenaltyNumFluxDiffusive(),
-               CentralGradPenalty())
+               CentralNumericalFluxGradient())
 
   Q = init_ode_state(dg, FT(0))
   Qrhs = dg.auxstate
@@ -133,6 +131,8 @@ end
 
 let
   CLIMA.init()
+  ArrayType = CLIMA.array_type()
+
   mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = ll == "DEBUG" ? Logging.Debug :
@@ -145,8 +145,8 @@ let
   base_num_elem = 4
   tol = 1e-9
 
-  linmethods = (b -> GeneralizedConjugateResidual(3, b, tol),
-                b -> GeneralizedMinimalResidual(7, b, tol)
+  linmethods = (b -> GeneralizedConjugateResidual(3, b, rtol=tol),
+                b -> GeneralizedMinimalResidual(b, M=7, rtol=tol)
                )
 
   expected_result = Array{Float64}(undef, 2, 2, 3) # method, dim-1, lvl
@@ -158,7 +158,7 @@ let
   expected_result[1, 2, 1] = 1.4957957657736219e-02
   expected_result[1, 2, 2] = 4.7282369781541172e-04
   expected_result[1, 2, 3] = 1.4697449643351771e-05
-  
+
   # GeneralizedMinimalResidual
   expected_result[2, 1, 1] = 5.0540243587512981e-02
   expected_result[2, 1, 2] = 1.4802275409186211e-03
@@ -177,7 +177,7 @@ let
         Ne = ntuple(d -> 2 ^ (l - 1) * base_num_elem, dim)
         brickrange = ntuple(d -> range(FT(0), length = Ne[d], stop = 1), dim)
         periodicity = ntuple(d -> true, dim)
-        
+
         @info (ArrayType, FT, m, dim)
         result[l] = run(mpicomm, ArrayType, FT, dim,
                         polynomialorder, brickrange, periodicity, linmethod)

@@ -24,7 +24,6 @@ using CLIMA.Mesh.Grids
 using CLIMA.Mesh.Filters
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.MPIStateArrays
-using CLIMA.StrongStabilityPreservingRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using CLIMA.VTK
@@ -33,8 +32,6 @@ using Logging
 using Dates
 using Printf
 using StaticArrays
-
-const DeviceArrayType = CLIMA.array_type()
 
 const finaltime = 5
 
@@ -120,6 +117,8 @@ end
 
 function run()
   CLIMA.init()
+  DeviceArrayType = CLIMA.array_type()
+
   mpicomm = MPI.COMM_WORLD
   mpi_logger = ConsoleLogger(MPI.Comm_rank(mpicomm) == 0 ? stderr : devnull)
   rank = MPI.Comm_rank(mpicomm)

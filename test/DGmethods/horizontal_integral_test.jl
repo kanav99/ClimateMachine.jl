@@ -11,7 +11,6 @@ using CLIMA.Mesh.Grids
 using CLIMA.MPIStateArrays
 using CLIMA.DGmethods
 using CLIMA.DGmethods.NumericalFluxes
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using CLIMA.Atmos
@@ -19,9 +18,7 @@ using CLIMA.VariableTemplates
 using CLIMA.MoistThermodynamics
 using CLIMA.PlanetParameters
 
-const ArrayType = CLIMA.array_type()
-
-function run_test1(mpicomm, dim, Ne, N, FT)
+function run_test1(mpicomm, dim, Ne, N, FT, ArrayType)
   warpfun = (ξ1, ξ2, ξ3) -> begin
     x1 = ξ1 + (ξ1 - 1/2) * cos(2 * π * ξ2 * ξ3) / 4
     x2 = ξ2  + (ξ2 - 1/2) * cos(2 * π * ξ2 * ξ3) / 4
@@ -77,7 +74,7 @@ function run_test1(mpicomm, dim, Ne, N, FT)
   @test Err < 2e-15
 end
 
-function run_test2(mpicomm, dim, Ne, N, FT)
+function run_test2(mpicomm, dim, Ne, N, FT, ArrayType)
   warpfun = (ξ1, ξ2, ξ3) -> begin
     x1 = sin(2 * π * ξ3)/16 + ξ1
     x2 = ξ2  + (ξ2 - 1/2) * cos(2 * π * ξ2 * ξ3) / 4
@@ -135,14 +132,14 @@ function run_test2(mpicomm, dim, Ne, N, FT)
   @test 2e-15 > Err
 end
 
-function run_test3(mpicomm, dim, Ne, N, FT)
+function run_test3(mpicomm, dim, Ne, N, FT, ArrayType)
   base_Nhorz = 4
   base_Nvert = 2
   Rinner = 1 // 2
   Router = 1
-  expected_result = [-4.5894269717905445e-8 -1.1473566985387151e-8;
-		     -2.0621904184281448e-10  -5.155431637149377e-11;
-	             -8.72191208145523e-13 -2.1715962361668062e-13]
+  expected_result = [-4.5894269717905445e-8  -1.1473566985387151e-8 ;
+		                 -2.0621904184281448e-10 -5.155431637149377e-11 ;
+	                   -8.72191208145523e-13   -2.1715962361668062e-13]
   for l in 1:3
     Nhorz = 2^(l-1) * base_Nhorz
     Nvert = 2^(l-1) * base_Nvert
@@ -172,30 +169,30 @@ function run_test3(mpicomm, dim, Ne, N, FT)
     for ev in 1:nvertelem
       for eh in 1:nhorzelem
         e = ev + (eh - 1) * nvertelem
-	for i in 1:Nq
-	  for j in 1:Nq
-	    for k in 1:Nqk
-	      ijk = i + Nq * ((j-1) + Nqk * (k-1))
-	      if (k == Nqk && ev == nvertelem)
-	        Surfout += localvgeo[ijk,grid.MHid,e]
-	      end
-	      if (k == 1 && ev == 1)
-	        Surfin += localvgeo[ijk,grid.MHid,e]
-	      end
-	    end
-	  end
+        for i in 1:Nq
+          for j in 1:Nq
+            for k in 1:Nqk
+              ijk = i + Nq * ((j-1) + Nqk * (k-1))
+              if (k == Nqk && ev == nvertelem)
+                Surfout += localvgeo[ijk,grid.MHid,e]
+              end
+              if (k == 1 && ev == 1)
+                Surfin += localvgeo[ijk,grid.MHid,e]
+              end
+            end
+          end
         end
       end
     end
     Surfouttot = MPI.Reduce(Surfout, +, 0, MPI.COMM_WORLD)
     Surfintot = MPI.Reduce(Surfin, +, 0, MPI.COMM_WORLD)
-    @test (4 * π * Router^2 - Surfouttot) ≈ expected_result[l,1]
-    @test (4 * π * Rinner^2 - Surfintot) ≈ expected_result[l,2]
+    @test (4 * π * Router^2 - Surfouttot) ≈ expected_result[l,1] rtol=1e-3 atol=eps(FT) * 4 * π * Router^2
+    @test (4 * π * Rinner^2 - Surfintot)  ≈ expected_result[l,2] rtol=1e-3 atol=eps(FT) * 4 * π * Rinner^2
   end
 end
 
 # Test for 2D integral
-function run_test4(mpicomm, dim, Ne, N, FT)
+function run_test4(mpicomm, dim, Ne, N, FT, ArrayType)
   brickrange = ntuple(j->range(FT(0); length=Ne+1, stop=1), 2)
   topl = StackedBrickTopology(mpicomm, brickrange,
                               periodicity=ntuple(j->true, 2))
@@ -231,7 +228,7 @@ function run_test4(mpicomm, dim, Ne, N, FT)
   @test Err <= 1e-15
 end
 
-function run_test5(mpicomm, dim, Ne, N, FT)
+function run_test5(mpicomm, dim, Ne, N, FT, ArrayType)
   warpfun = (ξ1, ξ2, ξ3) -> begin
     x1 = cos(π * ξ2)/16 + abs(ξ1)
     x2 = ξ2
@@ -280,8 +277,9 @@ end
 
 let
   CLIMA.init()
-  mpicomm = MPI.COMM_WORLD
+  ArrayType = CLIMA.array_type()
 
+  mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = ll == "DEBUG" ? Logging.Debug :
   ll == "WARN"  ? Logging.Warn  :
@@ -297,11 +295,11 @@ let
   @info (ArrayType, FT, dim)
 
   @testset "horizontal_integral" begin
-    run_test1(mpicomm, dim, Ne, polynomialorder, FT)
-    run_test2(mpicomm, dim, Ne, polynomialorder, FT)
-    run_test3(mpicomm, dim, Ne, polynomialorder, FT)
-    run_test4(mpicomm, dim, Ne, polynomialorder, FT)
-    run_test5(mpicomm, dim, Ne, polynomialorder, FT)
+    run_test1(mpicomm, dim, Ne, polynomialorder, FT, ArrayType)
+    run_test2(mpicomm, dim, Ne, polynomialorder, FT, ArrayType)
+    run_test3(mpicomm, dim, Ne, polynomialorder, FT, ArrayType)
+    run_test4(mpicomm, dim, Ne, polynomialorder, FT, ArrayType)
+    run_test5(mpicomm, dim, Ne, polynomialorder, FT, ArrayType)
   end
 end
 

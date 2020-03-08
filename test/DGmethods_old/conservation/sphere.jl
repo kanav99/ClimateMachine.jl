@@ -17,15 +17,12 @@ using CLIMA.Mesh.Grids
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.DGBalanceLawDiscretizations.NumericalFluxes
 using CLIMA.MPIStateArrays
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using LinearAlgebra
 using StaticArrays
 using Logging, Printf, Dates
 using Random
-
-const ArrayTypes = (CLIMA.array_type(),)
 
 const _nstate = 2
 const _q, _p = 1:_nstate
@@ -144,6 +141,8 @@ end
 using Test
 let
   CLIMA.init()
+  ArrayTypes = (CLIMA.array_type(),)
+
   mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = ll == "DEBUG" ? Logging.Debug :

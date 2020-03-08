@@ -1,35 +1,35 @@
 using CLIMA
 using CLIMA.Mesh.Topologies: StackedCubedSphereTopology, cubedshellwarp, grid1d
-using CLIMA.Mesh.Grids: DiscontinuousSpectralElementGrid
+using CLIMA.Mesh.Grids: DiscontinuousSpectralElementGrid, VerticalDirection
 using CLIMA.Mesh.Filters
-using CLIMA.DGmethods: DGModel, init_ode_state, VerticalDirection
-using CLIMA.DGmethods.NumericalFluxes: Rusanov, CentralGradPenalty,
+using CLIMA.DGmethods: DGModel, init_ode_state
+using CLIMA.DGmethods.NumericalFluxes: Rusanov, CentralNumericalFluxGradient,
                                        CentralNumericalFluxDiffusive
-using CLIMA.ODESolvers: solve!, gettime
-using CLIMA.AdditiveRungeKuttaMethod
+using CLIMA.ODESolvers
 using CLIMA.GeneralizedMinimalResidualSolver
 using CLIMA.ColumnwiseLUSolver: ManyColumnLU
 using CLIMA.VTK: writevtk, writepvtu
 using CLIMA.GenericCallbacks: EveryXWallTimeSeconds, EveryXSimulationSteps
 using CLIMA.PlanetParameters: planet_radius, day
-using CLIMA.MoistThermodynamics: air_density, soundspeed_air, internal_energy
+using CLIMA.MoistThermodynamics: air_density, soundspeed_air, internal_energy, PhaseDry_given_pT, PhasePartition
 using CLIMA.Atmos: AtmosModel, SphericalOrientation,
-                   DryModel, NoRadiation, NoFluxBC,
+                   DryModel, NoPrecipitation, NoRadiation, NoFluxBC,
                    ConstantViscosityWithDivergence,
                    vars_state, vars_aux,
                    Gravity, HydrostaticState, IsothermalProfile,
-                   AtmosAcousticGravityLinearModel
+                   AtmosAcousticGravityLinearModel, AtmosLESConfiguration,
+                   altitude, latitude, longitude, gravitational_potential
 using CLIMA.VariableTemplates: flattenednames
 
 using MPI, Logging, StaticArrays, LinearAlgebra, Printf, Dates, Test
-const ArrayType = CLIMA.array_type()
 
 const output_vtk = false
 
 function main()
   CLIMA.init()
-  mpicomm = MPI.COMM_WORLD
+  ArrayType = CLIMA.array_type()
 
+  mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = Dict("DEBUG" => Logging.Debug,
                   "WARN"  => Logging.Warn,
@@ -72,21 +72,21 @@ function run(mpicomm, polynomialorder, numelem_horz, numelem_vert,
                                           polynomialorder = polynomialorder,
                                           meshwarp = cubedshellwarp)
 
-  model = AtmosModel(SphericalOrientation(),
-                     HydrostaticState(IsothermalProfile(setup.T_ref), FT(0)),
-                     ConstantViscosityWithDivergence(FT(0)),
-                     DryModel(),
-                     NoRadiation(),
-                     Gravity(),
-                     NoFluxBC(),
-                     setup)
+  model = AtmosModel{FT}(AtmosLESConfiguration;
+                         orientation=SphericalOrientation(),
+                           ref_state=HydrostaticState(IsothermalProfile(setup.T_ref), FT(0)),
+                          turbulence=ConstantViscosityWithDivergence(FT(0)),
+                            moisture=DryModel(),
+                              source=Gravity(),
+                          init_state=setup)
   linearmodel = AtmosAcousticGravityLinearModel(model)
 
   dg = DGModel(model, grid, Rusanov(),
-               CentralNumericalFluxDiffusive(), CentralGradPenalty())
+               CentralNumericalFluxDiffusive(), CentralNumericalFluxGradient())
 
   lineardg = DGModel(linearmodel, grid, Rusanov(),
-                     CentralNumericalFluxDiffusive(), CentralGradPenalty();
+                     CentralNumericalFluxDiffusive(),
+                     CentralNumericalFluxGradient();
                      direction=VerticalDirection(),
                      auxstate=dg.auxstate)
 
@@ -181,24 +181,28 @@ Base.@kwdef struct AcousticWaveSetup{FT}
   nv::Int = 1
 end
 
-function (setup::AcousticWaveSetup)(state, aux, coords, t)
+function (setup::AcousticWaveSetup)(bl, state, aux, coords, t)
   # callable to set initial conditions
   FT = eltype(state)
 
-  r = norm(coords, 2)
-  @inbounds λ = atan(coords[2], coords[1])
-  @inbounds φ = asin(coords[3] / r)
-  h = r - FT(planet_radius)
+  λ = longitude(bl.orientation, aux)
+  φ = latitude(bl.orientation, aux)
+  z = altitude(bl.orientation, aux)
 
   β = min(FT(1), setup.α * acos(cos(φ) * cos(λ)))
   f = (1 + cos(FT(π) * β)) / 2
-  g = sin(setup.nv * FT(π) * h / setup.domain_height)
+  g = sin(setup.nv * FT(π) * z / setup.domain_height)
   Δp = setup.γ * f * g
   p = aux.ref_state.p + Δp
 
-  state.ρ = air_density(setup.T_ref, p)
+  ts       = PhaseDry_given_pT(p, setup.T_ref)
+  q_pt     = PhasePartition(ts)
+  e_pot    = gravitational_potential(bl.orientation, aux)
+  e_int    = internal_energy(ts)
+
+  state.ρ  = air_density(ts)
   state.ρu = SVector{3, FT}(0, 0, 0)
-  state.ρe = state.ρ * (internal_energy(setup.T_ref) + aux.orientation.Φ)
+  state.ρe = state.ρ * (e_int + e_pot)
   nothing
 end
 
@@ -208,7 +212,7 @@ function do_output(mpicomm, vtkdir, vtkstep, dg, Q, model, testname = "acousticw
                       vtkdir, testname, MPI.Comm_rank(mpicomm), vtkstep)
 
   statenames = flattenednames(vars_state(model, eltype(Q)))
-  auxnames = flattenednames(vars_aux(model, eltype(Q))) 
+  auxnames = flattenednames(vars_aux(model, eltype(Q)))
   writevtk(filename, Q, dg, statenames, dg.auxstate, auxnames)
 
   ## Generate the pvtu file for these vtk files

@@ -1,5 +1,5 @@
 
-# Load Packages 
+# Load Packages
 using MPI
 using CLIMA
 using CLIMA.Mesh.Topologies
@@ -8,7 +8,6 @@ using CLIMA.Mesh.Geometry
 using CLIMA.DGmethods
 using CLIMA.DGmethods.NumericalFluxes
 using CLIMA.MPIStateArrays
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using CLIMA.Atmos
@@ -23,14 +22,12 @@ using CLIMA.VTK
 using Random
 using CLIMA.Atmos: vars_state, vars_aux
 
-const ArrayType = CLIMA.array_type()
-
 if !@isdefined integration_testing
   const integration_testing =
     parse(Bool, lowercase(get(ENV,"JULIA_CLIMA_INTEGRATION_TESTING","false")))
 end
 
-# -------------- Problem constants ------------------- # 
+# -------------- Problem constants ------------------- #
 const dim               = 3
 const (xmin, xmax)      = (0,12800)
 const (ymin, ymax)      = (0,400)
@@ -40,7 +37,7 @@ const polynomialorder   = 4
 const dt                = 0.01
 const timeend           = 10dt
 
-# ------------- Initial condition function ----------- # 
+# ------------- Initial condition function ----------- #
 """
 @article{doi:10.1002/fld.1650170103,
 author = {Straka, J. M. and Wilhelmson, Robert B. and Wicker, Louis J. and Anderson, John R. and Droegemeier, Kelvin K.},
@@ -55,16 +52,16 @@ eprint = {https://onlinelibrary.wiley.com/doi/pdf/10.1002/fld.1650170103},
 year = {1993}
 }
 """
-function Initialise_Density_Current!(state::Vars, aux::Vars, (x1,x2,x3), t)
+function Initialise_Density_Current!(bl, state::Vars, aux::Vars, (x1,x2,x3), t)
   FT                = eltype(state)
   R_gas::FT         = R_d
   c_p::FT           = cp_d
   c_v::FT           = cv_d
   p0::FT            = MSLP
-  # initialise with dry domain 
+  # initialise with dry domain
   q_tot::FT         = 0
   q_liq::FT         = 0
-  q_ice::FT         = 0 
+  q_ice::FT         = 0
   # perturbation parameters for rising bubble
   rx                = 4000
   rz                = 2000
@@ -82,42 +79,44 @@ function Initialise_Density_Current!(state::Vars, aux::Vars, (x1,x2,x3), t)
   π_exner           = FT(1) - grav / (c_p * θ) * x3 # exner pressure
   ρ                 = p0 / (R_gas * θ) * (π_exner)^ (c_v / R_gas) # density
 
-  P                 = p0 * (R_gas * (ρ * θ) / p0) ^(c_p/c_v) # pressure (absolute)
-  T                 = P / (ρ * R_gas) # temperature
+  ts                = LiquidIcePotTempSHumEquil(θ, ρ, q_tot)
+  q_pt              = PhasePartition(ts)
+
   U, V, W           = FT(0) , FT(0) , FT(0)  # momentum components
   # energy definitions
   e_kin             = (U^2 + V^2 + W^2) / (2*ρ)/ ρ
-  e_pot             = grav * x3
-  e_int             = internal_energy(T, qvar)
+  e_pot             = gravitational_potential(bl.orientation, aux)
+  e_int             = internal_energy(ts)
   E                 = ρ * (e_int + e_kin + e_pot)  #* total_energy(e_kin, e_pot, T, q_tot, q_liq, q_ice)
   state.ρ      = ρ
   state.ρu     = SVector(U, V, W)
   state.ρe     = E
-  state.moisture.ρq_tot = FT(0)
+  state.moisture.ρq_tot = ρ*q_pt.tot
 end
-# --------------- Driver definition ------------------ # 
-function run(mpicomm,
-             topl, dim, Ne, polynomialorder, 
+# --------------- Driver definition ------------------ #
+function run(mpicomm, ArrayType,
+             topl, dim, Ne, polynomialorder,
              timeend, FT, dt)
-  # -------------- Define grid ----------------------------------- # 
+  # -------------- Define grid ----------------------------------- #
   grid = DiscontinuousSpectralElementGrid(topl,
                                           FloatType = FT,
                                           DeviceArray = ArrayType,
                                           polynomialorder = polynomialorder
                                            )
-  # -------------- Define model ---------------------------------- # 
-  model = AtmosModel(FlatOrientation(),
-                     NoReferenceState(),
-                     AnisoMinDiss{FT}(1), 
-                     EquilMoist(), 
-                     NoRadiation(),
-                     Gravity(), NoFluxBC(), Initialise_Density_Current!)
-  # -------------- Define dgbalancelaw --------------------------- # 
+  # -------------- Define model ---------------------------------- #
+  source = Gravity()
+  model = AtmosModel{FT}(AtmosLESConfiguration;
+                         ref_state=HydrostaticState(DryAdiabaticProfile(typemin(FT), FT(300)), FT(0)),
+                        turbulence=AnisoMinDiss{FT}(1),
+                            source=source,
+                 boundarycondition=NoFluxBC(),
+                        init_state=Initialise_Density_Current!)
+  # -------------- Define dgbalancelaw --------------------------- #
   dg = DGModel(model,
                grid,
                Rusanov(),
                CentralNumericalFluxDiffusive(),
-               CentralGradPenalty())
+               CentralNumericalFluxGradient())
 
   Q = init_ode_state(dg, FT(0))
 
@@ -174,10 +173,11 @@ function run(mpicomm,
   """ engf engf/eng0 engf-eng0 errf errf / engfe
 engf/eng0
 end
-# --------------- Test block / Loggers ------------------ # 
+# --------------- Test block / Loggers ------------------ #
 using Test
 let
   CLIMA.init()
+  ArrayType = CLIMA.array_type()
   mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = ll == "DEBUG" ? Logging.Debug :
@@ -191,8 +191,8 @@ let
                   range(FT(ymin); length=Ne[2]+1, stop=ymax),
                   range(FT(zmin); length=Ne[3]+1, stop=zmax))
     topl = StackedBrickTopology(mpicomm, brickrange, periodicity = (false, true, false))
-    engf_eng0 = run(mpicomm, 
-                    topl, dim, Ne, polynomialorder, 
+    engf_eng0 = run(mpicomm, ArrayType,
+                    topl, dim, Ne, polynomialorder,
                     timeend, FT, dt)
     @test engf_eng0 ≈ FT(9.9999970927037096e-01)
   end

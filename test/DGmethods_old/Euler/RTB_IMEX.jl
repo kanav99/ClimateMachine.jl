@@ -5,7 +5,6 @@ using CLIMA.Mesh.Grids
 using CLIMA.DGBalanceLawDiscretizations
 using CLIMA.DGBalanceLawDiscretizations.NumericalFluxes
 using CLIMA.MPIStateArrays
-using CLIMA.LowStorageRungeKuttaMethod
 using CLIMA.ODESolvers
 using CLIMA.GenericCallbacks
 using LinearAlgebra
@@ -14,14 +13,11 @@ using Logging, Printf, Dates
 using CLIMA.VTK
 using CLIMA.LinearSolvers
 using CLIMA.GeneralizedConjugateResidualSolver
-using CLIMA.AdditiveRungeKuttaMethod
 
 const γ_exact = 7 // 5 # FIXME: Remove this for some moist thermo approach
 
 using CLIMA.MoistThermodynamics
 using CLIMA.PlanetParameters: R_d, cp_d, grav, cv_d, MSLP, T_0
-
-const ArrayType = CLIMA.array_type()
 
 const _nstate = 5
 const _δρ, _ρu, _ρv, _ρw, _δρe = 1:_nstate
@@ -114,7 +110,7 @@ end
   end
 end
 
-@inline function source!(S, Q, aux, t)
+@inline function source!(S, Q, diffusive, aux, t)
   # Initialise the final block source term
   S .= -zero(eltype(Q))
 
@@ -240,11 +236,11 @@ end
   end
 end
 
-@inline function lin_source!(S, Q, aux, t)
+@inline function lin_source!(S, Q, diffusive, aux, t)
   S .= 0
-  lin_source_geopotential!(S, Q, aux, t)
+  lin_source_geopotential!(S, Q, diffusive, aux, t)
 end
-@inline function lin_source_geopotential!(S, Q, aux, t)
+@inline function lin_source_geopotential!(S, Q, diffusive, aux, t)
   @inbounds begin
     δρ = Q[_δρ]
     ∇ϕ = SVector(aux[_a_ϕ_x], aux[_a_ϕ_y], aux[_a_ϕ_z])
@@ -265,7 +261,7 @@ end
 
 # }}}
 
-function run(mpicomm, dim, brickrange, periodicity, N, timeend, FT, dt, output_steps)
+function run(mpicomm, ArrayType, dim, brickrange, periodicity, N, timeend, FT, dt, output_steps)
 
   topl = StackedBrickTopology(mpicomm, brickrange, periodicity = periodicity)
 
@@ -315,7 +311,7 @@ function run(mpicomm, dim, brickrange, periodicity, N, timeend, FT, dt, output_s
   # NOTE: In order to get the same results on the CPU and GPU we force ourselves
   # to take the same number of iterations by setting at really high tolerance
   # specifying the number of restarts
-  linearsolver = GeneralizedConjugateResidual(3, Q, 1e-8)
+  linearsolver = GeneralizedConjugateResidual(3, Q, rtol=1e-8)
 
   timestepper = ARK548L2SA2KennedyCarpenter(spacedisc, lin_spacedisc,
                                             linearsolver, Q; dt = dt, t0 = 0)
@@ -374,6 +370,8 @@ end
 using Test
 let
   CLIMA.init()
+  ArrayType = CLIMA.array_type()
+
   mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = ll == "DEBUG" ? Logging.Debug :
@@ -434,7 +432,7 @@ let
     @info @sprintf """     dt         = %.2e                               """ dt
     @info @sprintf """ ----------------------------------------------------"""
     
-    engf_eng0 = run(mpicomm,
+    engf_eng0 = run(mpicomm, ArrayType,
                     dim, brickrange, periodicity, polynomialorder,
                     timeend, FT, dt, output_steps)
 

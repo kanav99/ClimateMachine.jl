@@ -2,13 +2,9 @@ using CLIMA
 using CLIMA.Mesh.Topologies: BrickTopology
 using CLIMA.Mesh.Grids: DiscontinuousSpectralElementGrid
 using CLIMA.DGmethods: DGModel, init_ode_state, LocalGeometry
-using CLIMA.DGmethods.NumericalFluxes: Rusanov, CentralGradPenalty,
+using CLIMA.DGmethods.NumericalFluxes: Rusanov, CentralNumericalFluxGradient,
                                        CentralNumericalFluxDiffusive
-using CLIMA.ODESolvers: solve!, gettime
-using CLIMA.MultirateRungeKuttaMethod
-using CLIMA.LowStorageRungeKuttaMethod
-using CLIMA.StrongStabilityPreservingRungeKuttaMethod
-using CLIMA.AdditiveRungeKuttaMethod
+using CLIMA.ODESolvers
 using CLIMA.GeneralizedMinimalResidualSolver: GeneralizedMinimalResidual
 using CLIMA.VTK: writevtk, writepvtu
 using CLIMA.GenericCallbacks: EveryXWallTimeSeconds, EveryXSimulationSteps
@@ -20,14 +16,13 @@ using CLIMA.Atmos: AtmosModel,
                    AtmosAcousticLinearModel, RemainderModel,
                    NoOrientation,
                    NoReferenceState, ReferenceState,
-                   DryModel, NoRadiation, PeriodicBC,
-                   ConstantViscosityWithDivergence, vars_state
+                   DryModel, NoPrecipitation, NoRadiation, PeriodicBC,
+                   ConstantViscosityWithDivergence, vars_state,
+                   AtmosLESConfiguration
 using CLIMA.VariableTemplates: @vars, Vars, flattenednames
 import CLIMA.Atmos: atmos_init_aux!, vars_aux
 
 using MPI, Logging, StaticArrays, LinearAlgebra, Printf, Dates, Test
-
-const ArrayType = CLIMA.array_type()
 
 if !@isdefined integration_testing
   const integration_testing =
@@ -38,8 +33,9 @@ const output_vtk = false
 
 function main()
   CLIMA.init()
-  mpicomm = MPI.COMM_WORLD
+  ArrayType = CLIMA.array_type()
 
+  mpicomm = MPI.COMM_WORLD
   ll = uppercase(get(ENV, "JULIA_LOG_LEVEL", "INFO"))
   loglevel = Dict("DEBUG" => Logging.Debug,
                   "WARN"  => Logging.Warn,
@@ -56,7 +52,7 @@ function main()
   expected_error[Float64, SSPRK33ShuOsher, 2] = 5.2782503174265516e+00
   expected_error[Float64, SSPRK33ShuOsher, 3] = 1.2281763287878383e-01
   expected_error[Float64, SSPRK33ShuOsher, 4] = 2.3761870907666096e-03
-  
+
   expected_error[Float64, ARK2GiraldoKellyConstantinescu, 1] = 2.3245216640111998e+01
   expected_error[Float64, ARK2GiraldoKellyConstantinescu, 2] = 5.2626584944153949e+00
   expected_error[Float64, ARK2GiraldoKellyConstantinescu, 3] = 1.2324230746483673e-01
@@ -78,7 +74,7 @@ function main()
         for level in 1:numlevels
           numelems = ntuple(dim -> dim == 3 ? 1 : 2 ^ (level - 1) * 5, dims)
           errors[level] =
-            run(mpicomm, polynomialorder, numelems, setup,
+            run(mpicomm, ArrayType, polynomialorder, numelems, setup,
                 FT, FastMethod, dims, level)
 
           @test errors[level] ≈ expected_error[FT, FastMethod, level]
@@ -92,7 +88,7 @@ function main()
   end
 end
 
-function run(mpicomm, polynomialorder, numelems, setup,
+function run(mpicomm, ArrayType, polynomialorder, numelems, setup,
              FT, FastMethod, dims, level)
   brickrange = ntuple(dims) do dim
     range(-setup.domain_halflength; length=numelems[dim] + 1, stop=setup.domain_halflength)
@@ -107,29 +103,28 @@ function run(mpicomm, polynomialorder, numelems, setup,
                                           DeviceArray = ArrayType,
                                           polynomialorder = polynomialorder)
 
-  initialcondition! = function(args...)
-    isentropicvortex_initialcondition!(setup, args...)
-  end
-
-  model = AtmosModel(NoOrientation(),
-                     IsentropicVortexReferenceState{FT}(setup),
-                     ConstantViscosityWithDivergence(FT(0)),
-                     DryModel(),
-                     NoRadiation(),
-                     nothing,
-                     PeriodicBC(),
-                     initialcondition!)
+  model = AtmosModel{FT}(AtmosLESConfiguration;
+                         orientation=NoOrientation(),
+                           ref_state=IsentropicVortexReferenceState{FT}(setup),
+                          turbulence=ConstantViscosityWithDivergence(FT(0)),
+                            moisture=DryModel(),
+                              source=nothing,
+                   boundarycondition=PeriodicBC(),
+                          init_state=isentropicvortex_initialcondition!)
   # The linear model has the fast time scales
   fast_model = AtmosAcousticLinearModel(model)
   # The nonlinear model has the slow time scales
   slow_model = RemainderModel(model, (fast_model,))
 
-  dg = DGModel(model, grid, Rusanov(), CentralNumericalFluxDiffusive(), CentralGradPenalty())
+  dg = DGModel(model, grid, Rusanov(), CentralNumericalFluxDiffusive(),
+               CentralNumericalFluxGradient())
   fast_dg = DGModel(fast_model,
-                    grid, Rusanov(), CentralNumericalFluxDiffusive(), CentralGradPenalty();
+                    grid, Rusanov(), CentralNumericalFluxDiffusive(),
+                    CentralNumericalFluxGradient();
                     auxstate=dg.auxstate)
   slow_dg = DGModel(slow_model,
-                    grid, Rusanov(), CentralNumericalFluxDiffusive(), CentralGradPenalty();
+                    grid, Rusanov(), CentralNumericalFluxDiffusive(),
+                    CentralNumericalFluxGradient();
                     auxstate=dg.auxstate)
 
   timeend = FT(2 * setup.domain_halflength / setup.translation_speed)
@@ -139,16 +134,17 @@ function run(mpicomm, polynomialorder, numelems, setup,
   nsteps = ceil(Int, timeend / slow_dt)
   slow_dt = timeend / nsteps
 
-  # arbitrary and not needed for stabilty, just for testing
+  # arbitrary and not needed for stability, just for testing
   fast_dt = slow_dt / 3
 
-  Q = init_ode_state(dg, FT(0))
+  Q = init_ode_state(dg, FT(0), setup)
 
   slow_ode_solver = LSRK144NiegemannDiehlBusch(slow_dg, Q; dt = slow_dt)
 
   # check if FastMethod is ARK, is there a better way ?
-  if isdefined(AdditiveRungeKuttaMethod, Symbol(FastMethod))
-    linearsolver = GeneralizedMinimalResidual(10, Q, 1e-10)
+  if FastMethod == ARK2GiraldoKellyConstantinescu
+
+    linearsolver = GeneralizedMinimalResidual(Q; M=10, rtol=1e-10)
     # splitting the fast part into full and linear but the fast part
     # is already linear so full_dg == linear_dg == fast_dg
     fast_ode_solver = FastMethod(fast_dg, fast_dg, linearsolver, Q; dt = fast_dt, paperversion = true)
@@ -190,7 +186,7 @@ function run(mpicomm, polynomialorder, numelems, setup,
       "_poly$(polynomialorder)_dims$(dims)_$(ArrayType)_$(FT)" *
       "_$(FastMethod)_level$(level)"
     mkpath(vtkdir)
-    
+
     vtkstep = 0
     # output initial step
     do_output(mpicomm, vtkdir, vtkstep, dg, Q, Q, model)
@@ -199,7 +195,7 @@ function run(mpicomm, polynomialorder, numelems, setup,
     outputtime = timeend
     cbvtk = EveryXSimulationSteps(floor(outputtime / slow_dt)) do
       vtkstep += 1
-      Qe = init_ode_state(dg, gettime(ode_solver))
+      Qe = init_ode_state(dg, gettime(ode_solver), setup)
       do_output(mpicomm, vtkdir, vtkstep, dg, Q, Qe, model)
     end
     callbacks = (callbacks..., cbvtk)
@@ -208,7 +204,7 @@ function run(mpicomm, polynomialorder, numelems, setup,
   solve!(Q, ode_solver; timeend=timeend, callbacks=callbacks)
 
   # final statistics
-  Qe = init_ode_state(dg, timeend)
+  Qe = init_ode_state(dg, timeend, setup)
   engf = norm(Q)
   engfe = norm(Qe)
   errf = euclidean_distance(Q, Qe)
@@ -249,7 +245,7 @@ function atmos_init_aux!(m::IsentropicVortexReferenceState, atmos::AtmosModel, a
   aux.ref_state.ρe = ρ∞ * internal_energy(T∞)
 end
 
-function isentropicvortex_initialcondition!(setup, state, aux, coords, t)
+function isentropicvortex_initialcondition!(bl, state, aux, coords, t, setup)
   FT = eltype(state)
   x = MVector(coords)
 

@@ -255,7 +255,7 @@ end
     comm = MPI.COMM_SELF
 
     mesh = connectmesh(comm, partition(comm, brickmesh((0:10,),
-                                                       (true,))...)...)
+                                                       (true,))...)[1:4]...)
 
     nelem = 10
 
@@ -293,7 +293,7 @@ end
   let
     comm = MPI.COMM_SELF
     mesh = connectmesh(comm, partition(comm, brickmesh((0:4,5:9),
-                                                       (false,true))...)...)
+                                                       (false,true))...)[1:4]...)
 
     nelem = 16
 
@@ -344,7 +344,7 @@ end
   let
     comm = MPI.COMM_SELF
     x = (0:4,)
-    mesh = connectmesh(comm, partition(comm, brickmesh(x, (true,))...)...)
+    mesh = connectmesh(comm, partition(comm, brickmesh(x, (true,))...)[1:4]...)
 
     N = 3
     d = length(x)
@@ -352,18 +352,18 @@ end
     nface = 2d
     Nfp = (N+1)^(d-1)
 
-    vmapM, vmapP = mappings(N, mesh[:elemtoelem], mesh[:elemtoface],
+    vmap⁻, vmap⁺ = mappings(N, mesh[:elemtoelem], mesh[:elemtoface],
                             mesh[:elemtoordr])
 
-    @test vmapM == reshape([1,4,5,8,9,12,13,16], Nfp, nface, nelem)
-    @test vmapP == reshape([16,5,4,9,8,13,12,1], Nfp, nface, nelem)
+    @test vmap⁻ == reshape([1,4,5,8,9,12,13,16], Nfp, nface, nelem)
+    @test vmap⁺ == reshape([16,5,4,9,8,13,12,1], Nfp, nface, nelem)
   end
 
   let
     comm = MPI.COMM_SELF
     x = (-1:1, 0:1)
     p = (false, true)
-    mesh = connectmesh(comm, partition(comm, brickmesh(x, p)...)...)
+    mesh = connectmesh(comm, partition(comm, brickmesh(x, p)...)[1:4]...)
 
     N = 2
     d = length(x)
@@ -371,10 +371,10 @@ end
     nface = 2d
     Nfp = (N+1)^(d-1)
 
-    vmapM, vmapP = mappings(N, mesh[:elemtoelem], mesh[:elemtoface],
+    vmap⁻, vmap⁺ = mappings(N, mesh[:elemtoelem], mesh[:elemtoface],
                             mesh[:elemtoordr])
 
-    @test vmapM == reshape([ 1, 4, 7,  # f=1 e=1
+    @test vmap⁻ == reshape([ 1, 4, 7,  # f=1 e=1
                              3, 6, 9,  # f=2 e=1
                              1, 2, 3,  # f=3 e=1
                              7, 8, 9,  # f=4 e=1
@@ -384,7 +384,7 @@ end
                             16,17,18], # f=4 e=2
                            Nfp, nface, nelem)
 
-    @test vmapP == reshape([ 1, 4, 7,  # f=1 e=1
+    @test vmap⁺ == reshape([ 1, 4, 7,  # f=1 e=1
                             10,13,16,  # f=1 e=2
                              7, 8, 9,  # f=4 e=1
                              1, 2, 3,  # f=3 e=1
@@ -399,7 +399,7 @@ end
     comm = MPI.COMM_SELF
     x = (0:1, 0:1, -1:1)
     p = (false, true, false)
-    mesh = connectmesh(comm, partition(comm, brickmesh(x, p)...)...)
+    mesh = connectmesh(comm, partition(comm, brickmesh(x, p)...)[1:4]...)
 
     N = 2
     d = length(x)
@@ -408,7 +408,7 @@ end
     Np = (N+1)^d
     Nfp = (N+1)^(d-1)
 
-    vmapM, vmapP = mappings(N, mesh[:elemtoelem], mesh[:elemtoface],
+    vmap⁻, vmap⁺ = mappings(N, mesh[:elemtoelem], mesh[:elemtoface],
                             mesh[:elemtoordr])
 
     fmask = [ 1  3  1  7 1 19
@@ -422,10 +422,10 @@ end
              25 27 21 27 9 27]
 
 
-    @test vmapM == reshape([fmask[:]; fmask[:].+Np],
+    @test vmap⁻ == reshape([fmask[:]; fmask[:].+Np],
                            Nfp, nface, nelem)
 
-    @test vmapP == reshape([fmask[:,1];
+    @test vmap⁺ == reshape([fmask[:,1];
                             fmask[:,2];
                             fmask[:,4];
                             fmask[:,3];
@@ -462,7 +462,7 @@ end
 
 @testset "Partition" begin
   (etv, etc, etb, fc) = brickmesh((-1:2:1,-1:2:1,-2:1:2), (true,true,true))
-  (netv, netc, netb, nfc) = partition(MPI.COMM_SELF, etv, etc, etb, fc)
+  (netv, netc, netb, nfc) = partition(MPI.COMM_SELF, etv, etc, etb, fc)[1:4]
   @test etv == netv
   @test etc == netc
   @test etb == netb
