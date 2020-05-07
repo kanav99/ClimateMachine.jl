@@ -53,8 +53,34 @@ using ClimateMachine.VTK
 
 using CLIMAParameters
 using CLIMAParameters.Planet: R_d, cp_d, cv_d, cv_v, T_0, e_int_v0, grav
-struct EarthParameterSet <: AbstractEarthParameterSet end
-const param_set = EarthParameterSet()
+
+using CLIMAParameters.Atmos.Microphysics
+
+struct LiquidParameterSet <: AbstractLiquidParameterSet end
+struct IceParameterSet <: AbstractIceParameterSet end
+struct RainParameterSet <: AbstractRainParameterSet end
+struct SnowParameterSet <: AbstractSnowParameterSet end
+struct MicropysicsParameterSet{L, I, R, S} <: AbstractMicrophysicsParameterSet
+    liquid::L
+    ice::I
+    rain::R
+    snow::S
+end
+struct EarthParameterSet{M} <: AbstractEarthParameterSet
+    microphys_param_set::M
+end
+
+const microphys_param_set = MicropysicsParameterSet(
+    LiquidParameterSet(),
+    IceParameterSet(),
+    RainParameterSet(),
+    SnowParameterSet(),
+)
+const param_set = EarthParameterSet(microphys_param_set)
+const liquid_param_set = param_set.microphys_param_set.liquid
+const ice_param_set = param_set.microphys_param_set.ice
+const rain_param_set = param_set.microphys_param_set.rain
+const snow_param_set = param_set.microphys_param_set.snow
 
 import ClimateMachine.DGMethods:
     BalanceLaw,
@@ -135,7 +161,6 @@ function init_state_auxiliary!(
     aux::Vars,
     geom::LocalGeometry,
 )
-
     FT = eltype(aux)
     x, y, z = geom.coord
     dc = m.data_config
@@ -156,8 +181,11 @@ function init_state_auxiliary!(
             (dc.p_0 / dc.p_1000)^(_R_d / _cp_d) -
             _R_d / _cp_d * _grav / dc.θ_0 / R_m * (z - dc.z_0)
         )^(_cp_d / _R_d)
-    aux.p = p
-    aux.z = z
+
+    @inbounds begin
+        aux.p = p
+        aux.z = z
+    end
 end
 
 function init_state_conservative!(

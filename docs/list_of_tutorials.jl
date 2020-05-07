@@ -24,11 +24,6 @@ if generate_tutorials
             "Dry Rayleigh Bernard" => "Atmos/dry_rayleigh_benard.jl",
             "Dry Idealized GCM" => "Atmos/heldsuarez.jl",
             "Rising Thermal Bubble" => "Atmos/risingbubble.jl",
-            "Microphysics" => [
-                "Saturation adjustment" =>
-                    "Microphysics/ex_1_saturation_adjustment.jl",
-                "Kessler" => "Microphysics/ex_2_Kessler.jl",
-            ],
         ],
         "Ocean" => [],
         "Land" => ["Heat" => ["Heat Equation" => "Land/Heat/heat_equation.jl"]],
@@ -66,8 +61,6 @@ if generate_tutorials
         "Atmos/heldsuarez.jl",                        # broken
         "Atmos/risingbubble.jl",                      # broken
         "Numerics/DGMethods/nonnegative.jl",          # broken
-        "Microphysics/ex_1_saturation_adjustment.jl", # too long
-        "Microphysics/ex_2_Kessler.jl",               # too long
         "topo.jl",                                    # broken
     ]
 
