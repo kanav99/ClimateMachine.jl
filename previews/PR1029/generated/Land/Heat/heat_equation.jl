@@ -43,7 +43,7 @@ ClimateMachine.init(; disable_gpu = true);
 const clima_dir = dirname(dirname(pathof(ClimateMachine)));
 
 include(joinpath(clima_dir, "tutorials", "Land", "helper_funcs.jl"));
-include(joinpath(clima_dir, "tutorials", "Land", "plotting_funcs.jl"));
+include(joinpath(clima_dir, "docs", "plothelpers.jl"));
 
 Base.@kwdef struct HeatModel{FT} <: BalanceLaw
     "Parameters"
