@@ -1,5 +1,4 @@
 using MPI
-using NCDatasets
 using OrderedCollections
 using Plots
 using StaticArrays
@@ -189,9 +188,9 @@ end;
 
 N_poly = 5;
 
-nelem_vert = 20;
+nelem_vert = 10;
 
-zmax = FT(10);
+zmax = FT(1);
 
 driver_config = ClimateMachine.SingleStackConfiguration(
     "HeatEquation",
@@ -248,11 +247,10 @@ const n_outputs = 5;
 
 const every_x_simulation_time = ceil(Int, timeend / n_outputs);
 
-dims = OrderedDict(z_key => collect(z));
+all_data = Dict([k => Dict() for k in 0:n_outputs]...)
+all_data[0] = all_vars # store initial condition at ``t=0``
 
-output_data = DataFile(joinpath(output_dir, "output_data"));
-
-step = [0];
+step = [1];
 callback = GenericCallbacks.EveryXSimulationTime(
     every_x_simulation_time,
     solver_config.solver,
@@ -271,21 +269,13 @@ callback = GenericCallbacks.EveryXSimulationTime(
         exclude = [z_key],
     )
     all_vars = OrderedDict(state_vars..., aux_vars...)
-    all_vars = prep_for_io(z_label, all_vars)
-    write_data(
-        NetCDFWriter(),
-        output_data(step[1]),
-        dims,
-        all_vars,
-        gettime(solver_config.solver),
-    )
+    all_data[step[1]] = all_vars
+
     step[1] += 1
     nothing
 end;
 
 ClimateMachine.invoke!(solver_config; user_callbacks = (callback,))
-
-all_data = collect_data(output_data, step[1]);
 
 @show keys(all_data[0])
 
