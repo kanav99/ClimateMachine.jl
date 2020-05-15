@@ -21,7 +21,7 @@ are:\
     - `turbulence=Vreman(C_smag)`\
     - `turbulence=AnisoMinDiss(C_poincare)`
 
-```@example turbulence
+```julia
 using DocStringExtensions
 using CLIMAParameters.Atmos.SubgridScale: inv_Pr_turb
 export ConstantViscosityWithDivergence, SmagorinskyLilly, Vreman, AnisoMinDiss
@@ -34,7 +34,7 @@ default functions for the generic turbulence closure
 which will be overloaded with model specific functions. Minimally, overloaded functions for the
 following stubs must be defined for a turbulence model.
 
-```@example turbulence
+```julia
 abstract type TurbulenceClosure end
 
 
@@ -70,7 +70,7 @@ The following may need to be addressed if turbulence models require
 additional state variables or auxiliary variable updates (e.g. TKE
 based models)
 
-```@example turbulence
+```julia
 vars_state_conservative(::TurbulenceClosure, FT) = @vars()
 function atmos_nodal_update_auxiliary_state!(
     ::TurbulenceClosure,
@@ -86,7 +86,7 @@ The following function provides an example of a stub for an eddy-viscosity model
 Currently, scalar and diagonal tensor viscosities and diffusivities are supported.
 
 ```@docs
-CLIMA.Atmos.turbulence_tensors
+ClimateMachine.Atmos.turbulence_tensors
 ```
 
 Generic math functions for use within the turbulence closures such as the [principal tensor invariants](@ref tensor-invariants),
@@ -100,7 +100,7 @@ Generic math functions for use within the turbulence closures such as the [princ
 ```
 
 ```@docs
-CLIMA.Atmos.principal_invariants
+ClimateMachine.Atmos.principal_invariants
 ```
 
 ### [Symmetrize](@id symmetric-tensors)
@@ -108,7 +108,7 @@ CLIMA.Atmos.principal_invariants
 \frac{\mathrm{X} + \mathrm{X}^{T}}{2} \\
 ```
 ```@docs
-CLIMA.Atmos.symmetrize
+ClimateMachine.Atmos.symmetrize
 ```
 
 ### [2-Norm](@id tensor-norms)
@@ -117,7 +117,7 @@ Given a tensor X, return the tensor dot product
 \sum_{i,j} S_{ij}^2
 ```
 ```@docs
-CLIMA.Atmos.norm2
+ClimateMachine.Atmos.norm2
 ```
 
 ### [Strain-rate Magnitude](@id strain-rate-magnitude)
@@ -134,10 +134,10 @@ where
 skew symmetric component (rate-of-rotation) is not currently computed.
 
 ```@docs
-CLIMA.Atmos.strain_rate_magnitude
+ClimateMachine.Atmos.strain_rate_magnitude
 ```
 
-```@example turbulence
+```julia
 """
     strain_rate_magnitude(S)
 Given the rate-of-strain tensor `S`, computes its magnitude.
@@ -156,12 +156,12 @@ computed using the turbulent Prandtl number for the appropriate problem regime.
 ```
 
 ```@docs
-CLIMA.Atmos.ConstantViscosityWithDivergence
+ClimateMachine.Atmos.ConstantViscosityWithDivergence
 ```
 
 ## [Smagorinsky-Lilly](@id smagorinsky-lilly)
 The Smagorinsky turbulence model, with Lilly's correction to
-stratified atmospheric flows, is included in CLIMA.
+stratified atmospheric flows, is included in ClimateMachine.
 The input parameter to this model is the Smagorinsky coefficient.
 For atmospheric flows, the coefficient `C_smag` typically takes values between
 0.15 and 0.23. Flow dependent `C_smag` are currently not supported (e.g. Germano's
@@ -193,7 +193,7 @@ local effective resolution (see `src/Mesh/Geometry.jl`), and modify the vertical
 stratification correction factor $\mathrm{f}_{b}$ so that $\Delta_{vert} = \Delta z f_b$.
 
 ```@docs
-CLIMA.Atmos.SmagorinskyLilly
+ClimateMachine.Atmos.SmagorinskyLilly
 ```
 
 ## [Vreman Model](@id vreman)
@@ -218,7 +218,7 @@ u_{i,j} &= \frac{\partial u_{i}}{\partial x_{j}}.
 ```
 
 ```@docs
-CLIMA.Atmos.Vreman
+ClimateMachine.Atmos.Vreman
 ```
 
 ## [Anisotropic Minimum Dissipation](@id aniso-min-diss)
@@ -230,5 +230,5 @@ eddy viscosity and eddy diffusivity.
 \nu_e = (\mathrm{C}\delta)^2  \mathrm{max}\left[0, - \frac{\hat{\partial}_k \hat{u}_{i} \hat{\partial}_k \hat{u}_{j} \mathrm{\hat{S}}_{ij}}{\hat{\partial}_p \hat{u}_{q} \hat{\partial}_p \hat{u}_{q}} \right]
 ```
 ```@docs
-CLIMA.Atmos.AnisoMinDiss
+ClimateMachine.Atmos.AnisoMinDiss
 ```

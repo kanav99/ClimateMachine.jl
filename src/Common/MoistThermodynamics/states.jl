@@ -78,17 +78,33 @@ struct PhaseEquil{FT, PS} <: ThermodynamicState{FT}
     "temperature: computed via [`saturation_adjustment`](@ref)"
     T::FT
 end
+
+"""
+    PhaseEquil
+Moist thermodynamic phase, given
+ - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `e_int` internal energy
+ - `ρ` density
+ - `q_tot` total specific humidity
+and, optionally
+ - `maxiter` maximum iterations for saturation adjustment
+ - `temperature_tol` temperature tolerance for saturation adjustment
+ - `sat_adjust` function pointer to particular saturation adjustment method, options include
+    - `saturation_adjustment` uses Newtons method with analytic gradients
+    - `saturation_adjustment_SecantMethod` uses Secant method
+"""
 function PhaseEquil(
     param_set::APS,
     e_int::FT,
     ρ::FT,
     q_tot::FT,
-    maxiter::Int = 3,
-    tol::FT = FT(1e-1),
+    maxiter::Int = 6,
+    temperature_tol::FT = FT(1e-1),
     sat_adjust::Function = saturation_adjustment,
 ) where {FT <: Real}
-    # TODO: Remove these safety nets, or at least add warnings
-    # waiting on fix: github.com/vchuravy/GPUifyLoops.jl/issues/104
+    _cv_d = FT(cv_d(param_set))
+    # Convert temperature tolerance to a convergence criterion on internal energy residuals
+    tol = ResidualTolerance(temperature_tol * _cv_d)
     q_tot_safe = clamp(q_tot, FT(0), FT(1))
     T = sat_adjust(param_set, e_int, ρ, q_tot_safe, maxiter, tol)
     return PhaseEquil{FT, typeof(param_set)}(param_set, e_int, ρ, q_tot_safe, T)
@@ -143,7 +159,7 @@ Constructs a [`PhaseEquil`](@ref) thermodynamic state from:
  - `θ_liq_ice` liquid-ice potential temperature
  - `ρ` (moist-)air density
  - `q_tot` total specific humidity
- - `tol` tolerance for saturation adjustment
+ - `temperature_tol` temperature tolerance for saturation adjustment
  - `maxiter` maximum iterations for saturation adjustment
 """
 function LiquidIcePotTempSHumEquil(
@@ -151,9 +167,10 @@ function LiquidIcePotTempSHumEquil(
     θ_liq_ice::FT,
     ρ::FT,
     q_tot::FT,
-    maxiter::Int = 30,
-    tol::FT = FT(1e-1),
+    maxiter::Int = 36,
+    temperature_tol::FT = FT(1e-1),
 ) where {FT <: Real}
+    tol = ResidualTolerance(temperature_tol)
     T = saturation_adjustment_q_tot_θ_liq_ice(
         param_set,
         θ_liq_ice,
@@ -176,7 +193,7 @@ Constructs a [`PhaseEquil`](@ref) thermodynamic state from:
  - `θ_liq_ice` liquid-ice potential temperature
  - `p` pressure
  - `q_tot` total specific humidity
- - `tol` tolerance for saturation adjustment
+ - `temperature_tol` temperature tolerance for saturation adjustment
  - `maxiter` maximum iterations for saturation adjustment
 """
 function LiquidIcePotTempSHumEquil_given_pressure(
@@ -185,8 +202,9 @@ function LiquidIcePotTempSHumEquil_given_pressure(
     p::FT,
     q_tot::FT,
     maxiter::Int = 30,
-    tol::FT = FT(1e-1),
+    temperature_tol::FT = FT(1e-1),
 ) where {FT <: Real}
+    tol = ResidualTolerance(temperature_tol)
     T = saturation_adjustment_q_tot_θ_liq_ice_given_pressure(
         param_set,
         θ_liq_ice,
@@ -267,7 +285,7 @@ Constructs a [`PhaseNonEquil`](@ref) thermodynamic state from:
  - `ρ` (moist-)air density
  - `q_pt` phase partition
 and, optionally
- - `tol` tolerance for non-linear equation solve
+ - `potential_temperature_tol` potential temperature for non-linear equation solve
  - `maxiter` maximum iterations for non-linear equation solve
 """
 function LiquidIcePotTempSHumNonEquil(
@@ -275,9 +293,10 @@ function LiquidIcePotTempSHumNonEquil(
     θ_liq_ice::FT,
     ρ::FT,
     q_pt::PhasePartition{FT},
-    maxiter::Int = 5,
-    tol::FT = FT(1e-1),
+    maxiter::Int = 10,
+    potential_temperature_tol::FT = FT(1e-2),
 ) where {FT <: Real}
+    tol = ResidualTolerance(potential_temperature_tol)
     T = air_temperature_from_liquid_ice_pottemp_non_linear(
         param_set,
         θ_liq_ice,

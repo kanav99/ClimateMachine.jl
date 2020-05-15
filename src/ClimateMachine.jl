@@ -1,8 +1,8 @@
-module CLIMA
+module ClimateMachine
 
 using Pkg.TOML
 
-const CLIMA_VERSION =
+const CLIMATEMACHINE_VERSION =
     VersionNumber(TOML.parsefile(joinpath(dirname(@__DIR__), "Project.toml"))["version"])
 
 include(joinpath("Utilities", "TicToc", "TicToc.jl"))
@@ -41,6 +41,11 @@ include(joinpath(
 ))
 include(joinpath("Numerics", "LinearSolvers", "ColumnwiseLUSolver.jl"))
 include(joinpath("Numerics", "LinearSolvers", "ConjugateGradientSolver.jl"))
+include(joinpath(
+    "Numerics",
+    "LinearSolvers",
+    "BatchedGeneralizedMinimalResidualSolver.jl",
+))
 include(joinpath("Numerics", "ODESolvers", "ODESolvers.jl"))
 include(joinpath("Numerics", "ODESolvers", "GenericCallbacks.jl"))
 include(joinpath("Atmos", "Model", "AtmosModel.jl"))

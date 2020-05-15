@@ -99,7 +99,7 @@ If MoistThermodynamics.jl does not have a particular thermodynamic constructor t
  - `PhaseEquil` a moist thermodynamic state in thermodynamic equilibrium, uniquely determined by three independent thermodynamic properties
  - `PhaseNonEquil` a moist thermodynamic state in thermodynamic non-equilibrium, uniquely determined by four independent thermodynamic properties
 
-For example, to add a thermodynamic state constructor that accepts temperature, density and total specific humidity, we could add the following code to states:
+For example, to add a thermodynamic state constructor that accepts temperature, density and total specific humidity, we could add the following code to `states.jl`:
 
 ```
 """
@@ -136,17 +136,13 @@ MT = MoistThermodynamics
 using CLIMAParameters
 using CLIMAParameters.Planet
 using Plots
-
 struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
-
 FT = Float64;
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = MT.tested_profiles(param_set, 50, FT);
-
 mask_dry = q_tot .≈ 0;
 ρ_dry = ρ[mask_dry];
 T_dry = T[mask_dry];
-
 scatter(ρ_dry, T_dry, xlabel="Density [kg/m^3]", ylabel="T [K]", title="Tested states for\ndry thermodynamic phase", legend=false);
 savefig("tested_profiles_dry.svg");
 ```
@@ -160,13 +156,10 @@ MT = MoistThermodynamics
 using CLIMAParameters
 using CLIMAParameters.Planet
 using Plots
-
 struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
-
 FT = Float64;
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = MT.tested_profiles(param_set, 50, FT);
-
 p1 = scatter(ρ, z./10^3, xlabel="Density [kg/m^3]", ylabel="z [km]", title="Density");
 p2 = scatter(T, z./10^3, xlabel="Temperature [K]", ylabel="z [km]", title="Temperature");
 p3 = scatter(q_tot*1000, z./10^3, xlabel="Total specific\nhumidity [g/kg]", ylabel="z [km]", title="Total specific\nhumidity");

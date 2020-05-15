@@ -16,7 +16,7 @@ In `tracers.jl`, we define the equation sets governing
 tracer dynamics. Specifically, we address the the equations
 of tracer motion in conservation form,
 
-```@example tracers
+```julia
 export NoTracers, NTracers
 ```
 
@@ -38,9 +38,8 @@ and [`NTracers`](@ref multiple-tracers).
 
 Default stub functions for a generic tracer type are defined here.
 
-```@example tracers
-abstract type TracerModel end
-
+```julia
+abstract type TracerModel <: BalanceLaw end
 
 vars_state_conservative(::TracerModel, FT) = @vars()
 vars_state_gradient(::TracerModel, FT) = @vars()
@@ -113,7 +112,7 @@ carried around). For the purposes of this model, moist variables are
 considered separately in `moisture.jl`.
 
 ```@docs
-CLIMA.Atmos.NoTracers
+ClimateMachine.Atmos.NoTracers
 ```
 
 ## [NTracers](@id multiple-tracers)
@@ -125,5 +124,5 @@ corresponding numerical vector index. Initial profiles must be specified using t
 `init_state_conservative!` hook at the experiment level.
 
 ```@docs
-CLIMA.Atmos.NTracers{N,FT}
+ClimateMachine.Atmos.NTracers{N,FT}
 ```
