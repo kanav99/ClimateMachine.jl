@@ -14,7 +14,8 @@ using ClimateMachine.DGmethods: BalanceLaw, LocalGeometry
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
-using ClimateMachine.VariableTemplates</code></pre><ul><li>import necessary ClimateMachine modules: (<code>import</code>ing enables us to</li></ul><p>provide implementations of these structs/methods)</p><pre><code class="language-julia">import ClimateMachine.DGmethods:
+using ClimateMachine.VariableTemplates
+using ClimateMachine.SingleStackUtils</code></pre><ul><li>import necessary ClimateMachine modules: (<code>import</code>ing enables us to</li></ul><p>provide implementations of these structs/methods)</p><pre><code class="language-julia">import ClimateMachine.DGmethods:
     vars_state_auxiliary,
     vars_state_conservative,
     vars_state_gradient,
@@ -30,8 +31,7 @@ using ClimateMachine.VariableTemplates</code></pre><ul><li>import necessary Clim
     init_state_conservative!,
     boundary_state!</code></pre><h2 id="Initialization-1"><a class="docs-heading-anchor" href="#Initialization-1">Initialization</a><a class="docs-heading-anchor-permalink" href="#Initialization-1" title="Permalink"></a></h2><p>Define the float type (<code>Float64</code> or <code>Float32</code>)</p><pre><code class="language-julia">FT = Float64;</code></pre><p>Initialize ClimateMachine for CPU.</p><pre><code class="language-julia">ClimateMachine.init(; disable_gpu = true);
 
-const clima_dir = dirname(dirname(pathof(ClimateMachine)));</code></pre><p>Load some helper functions (soon to be incorporated into <code>ClimateMachine/src</code>)</p><pre><code class="language-julia">include(joinpath(clima_dir, &quot;tutorials&quot;, &quot;Land&quot;, &quot;helper_funcs.jl&quot;));
-include(joinpath(clima_dir, &quot;docs&quot;, &quot;plothelpers.jl&quot;));</code></pre><h1 id="Define-the-set-of-Partial-Differential-Equations-(PDEs)-1"><a class="docs-heading-anchor" href="#Define-the-set-of-Partial-Differential-Equations-(PDEs)-1">Define the set of Partial Differential Equations (PDEs)</a><a class="docs-heading-anchor-permalink" href="#Define-the-set-of-Partial-Differential-Equations-(PDEs)-1" title="Permalink"></a></h1><h2 id="Define-the-model-1"><a class="docs-heading-anchor" href="#Define-the-model-1">Define the model</a><a class="docs-heading-anchor-permalink" href="#Define-the-model-1" title="Permalink"></a></h2><p>Model parameters can be stored in the particular <a href="generated/Land/Heat/@ref ClimateMachine.DGMethods.BalanceLaw"><code>BalanceLaw</code></a>, in this case, a <code>HeatModel</code>:</p><pre><code class="language-julia">Base.@kwdef struct HeatModel{FT} &lt;: BalanceLaw
+const clima_dir = dirname(dirname(pathof(ClimateMachine)));</code></pre><p>Load some helper functions for plotting</p><pre><code class="language-julia">include(joinpath(clima_dir, &quot;docs&quot;, &quot;plothelpers.jl&quot;));</code></pre><h1 id="Define-the-set-of-Partial-Differential-Equations-(PDEs)-1"><a class="docs-heading-anchor" href="#Define-the-set-of-Partial-Differential-Equations-(PDEs)-1">Define the set of Partial Differential Equations (PDEs)</a><a class="docs-heading-anchor-permalink" href="#Define-the-set-of-Partial-Differential-Equations-(PDEs)-1" title="Permalink"></a></h1><h2 id="Define-the-model-1"><a class="docs-heading-anchor" href="#Define-the-model-1">Define the model</a><a class="docs-heading-anchor-permalink" href="#Define-the-model-1" title="Permalink"></a></h2><p>Model parameters can be stored in the particular <a href="generated/Land/Heat/@ref ClimateMachine.DGMethods.BalanceLaw"><code>BalanceLaw</code></a>, in this case, a <code>HeatModel</code>:</p><pre><code class="language-julia">Base.@kwdef struct HeatModel{FT} &lt;: BalanceLaw
     &quot;Parameters&quot;
     param_set::AbstractParameterSet = param_set
     &quot;Heat capacity&quot;
@@ -169,26 +169,246 @@ timeend = FT(40)</code></pre><pre><code class="language-none">40.0</code></pre><
 given_Fourier = FT(0.08);
 Fourier_bound = given_Fourier * Δ^2 / m.α;
 dt = Fourier_bound</code></pre><pre><code class="language-none">0.0011039800162777238</code></pre><h1 id="Configure-a-ClimateMachine-solver.-1"><a class="docs-heading-anchor" href="#Configure-a-ClimateMachine-solver.-1">Configure a <code>ClimateMachine</code> solver.</a><a class="docs-heading-anchor-permalink" href="#Configure-a-ClimateMachine-solver.-1" title="Permalink"></a></h1><p>This initializes the state vector and allocates memory for the solution in space (<code>dg</code> has the model <code>m</code>, which describes the PDEs as well as the function used for initialization). This additionally initializes the ODE solver, by default an explicit Low-Storage <a href="https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods">Runge-Kutta</a> method.</p><pre><code class="language-julia">solver_config =
-    ClimateMachine.SolverConfiguration(t0, timeend, driver_config, ode_dt = dt);</code></pre><pre><code class="language-none">[ Info: Initializing HeatEquation</code></pre><h2 id="Inspect-the-initial-conditions-1"><a class="docs-heading-anchor" href="#Inspect-the-initial-conditions-1">Inspect the initial conditions</a><a class="docs-heading-anchor-permalink" href="#Inspect-the-initial-conditions-1" title="Permalink"></a></h2><p>Let&#39;s export a plot of the initial state</p><pre><code class="language-julia">output_dir = @__DIR__;
+    ClimateMachine.SolverConfiguration(t0, timeend, driver_config, ode_dt = dt);
+grid = solver_config.dg.grid
+Q = solver_config.Q
+aux = solver_config.dg.state_auxiliary</code></pre><pre><code class="language-none">216×2×10 ClimateMachine.MPIStateArrays.MPIStateArray{Float64,NamedTuple{(:z, :T),Tuple{Float64,Float64}},Array{Float64,3},Array{Int64,1},SubArray{Float64,3,Array{Float64,3},Tuple{Base.Slice{Base.OneTo{Int64}},Base.Slice{Base.OneTo{Int64}},UnitRange{Int64}},true},ClimateMachine.MPIStateArrays.CMBuffers.CMBuffer{Float64,Array{Float64,2},Nothing}}:
+[:, :, 1] =
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ 0.0  295.15
+ ⋮          
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+
+[:, :, 2] =
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ 0.1  295.15
+ ⋮          
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+
+[:, :, 3] =
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ 0.2  295.15
+ ⋮          
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+
+[:, :, 4] =
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ 0.3  295.15
+ ⋮          
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+
+[:, :, 5] =
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ 0.4  295.15
+ ⋮          
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+
+[:, :, 6] =
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ 0.5  295.15
+ ⋮          
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+
+[:, :, 7] =
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ 0.6  295.15
+ ⋮          
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+
+[:, :, 8] =
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ 0.7  295.15
+ ⋮          
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+
+[:, :, 9] =
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ 0.8  295.15
+ ⋮          
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+
+[:, :, 10] =
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ 0.9  295.15
+ ⋮          
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15
+ 1.0  295.15</code></pre><h2 id="Inspect-the-initial-conditions-1"><a class="docs-heading-anchor" href="#Inspect-the-initial-conditions-1">Inspect the initial conditions</a><a class="docs-heading-anchor-permalink" href="#Inspect-the-initial-conditions-1" title="Permalink"></a></h2><p>Let&#39;s export a plot of the initial state</p><pre><code class="language-julia">output_dir = @__DIR__;
 
 mkpath(output_dir);
 
 z_scale = 100 # convert from meters to cm
 z_key = &quot;z&quot;
 z_label = &quot;z [cm]&quot;
-z = get_z(driver_config.grid, z_scale)
-state_vars = get_vars_from_stack(
-    driver_config.grid,
-    solver_config.Q,
-    m,
-    vars_state_conservative,
-);
-aux_vars = get_vars_from_stack(
-    driver_config.grid,
-    solver_config.dg.state_auxiliary,
-    m,
-    vars_state_auxiliary,
-);
+z = get_z(grid, z_scale)
+state_vars = SingleStackUtils.get_vars_from_nodal_stack(
+    grid,
+    Q,
+    vars_state_conservative(m, FT),
+)
+aux_vars = SingleStackUtils.get_vars_from_nodal_stack(
+    grid,
+    aux,
+    vars_state_auxiliary(m, FT),
+)
 all_vars = OrderedDict(state_vars..., aux_vars...);
 export_plot_snapshot(
     z,
@@ -197,25 +417,23 @@ export_plot_snapshot(
     joinpath(output_dir, &quot;initial_condition.png&quot;),
     z_label,
 );</code></pre><p><img src="../initial_condition.png" alt/></p><p>It matches what we have in <code>init_state_conservative!(m::HeatModel, ...)</code>, so let&#39;s continue.</p><h1 id="Solver-hooks-/-callbacks-1"><a class="docs-heading-anchor" href="#Solver-hooks-/-callbacks-1">Solver hooks / callbacks</a><a class="docs-heading-anchor-permalink" href="#Solver-hooks-/-callbacks-1" title="Permalink"></a></h1><p>Define the number of outputs from <code>t0</code> to <code>timeend</code></p><pre><code class="language-julia">const n_outputs = 5;</code></pre><p>This equates to exports every ceil(Int, timeend/n_outputs) time-step:</p><pre><code class="language-julia">const every_x_simulation_time = ceil(Int, timeend / n_outputs);</code></pre><p>Create a nested dictionary to store the solution:</p><pre><code class="language-julia">all_data = Dict([k =&gt; Dict() for k in 0:n_outputs]...)
-all_data[0] = all_vars # store initial condition at ``t=0``</code></pre><pre><code class="language-none">OrderedCollections.OrderedDict{Any,Any} with 3 entries:
+all_data[0] = all_vars # store initial condition at ``t=0``</code></pre><pre><code class="language-none">OrderedCollections.OrderedDict{String,Array{Float64,1}} with 3 entries:
   &quot;ρcT&quot; =&gt; [295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295…
-  &quot;T&quot;   =&gt; [295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295…
-  &quot;z&quot;   =&gt; [0.0, 0.0117472, 0.0357384, 0.0642616, 0.0882528, 0.1, 0.1, 0.111747…</code></pre><p>The <code>ClimateMachine</code>&#39;s time-steppers provide hooks, or callbacks, which allow users to inject code to be executed at specified intervals. In this callback, the state and aux variables are collected, combined into a single <code>OrderedDict</code> and written to a NetCDF file (for each output step <code>step</code>).</p><pre><code class="language-julia">step = [1];
+  &quot;z&quot;   =&gt; [0.0, 0.0117472, 0.0357384, 0.0642616, 0.0882528, 0.1, 0.1, 0.111747…
+  &quot;T&quot;   =&gt; [295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295.15, 295…</code></pre><p>The <code>ClimateMachine</code>&#39;s time-steppers provide hooks, or callbacks, which allow users to inject code to be executed at specified intervals. In this callback, the state and aux variables are collected, combined into a single <code>OrderedDict</code> and written to a NetCDF file (for each output step <code>step</code>).</p><pre><code class="language-julia">step = [1];
 callback = GenericCallbacks.EveryXSimulationTime(
     every_x_simulation_time,
     solver_config.solver,
 ) do (init = false)
-    state_vars = get_vars_from_stack(
-        driver_config.grid,
-        solver_config.Q,
-        m,
-        vars_state_conservative,
+    state_vars = SingleStackUtils.get_vars_from_nodal_stack(
+        grid,
+        Q,
+        vars_state_conservative(m, FT),
     )
-    aux_vars = get_vars_from_stack(
-        driver_config.grid,
-        solver_config.dg.state_auxiliary,
-        m,
-        vars_state_auxiliary;
+    aux_vars = SingleStackUtils.get_vars_from_nodal_stack(
+        grid,
+        aux,
+        vars_state_auxiliary(m, FT);
         exclude = [z_key],
     )
     all_vars = OrderedDict(state_vars..., aux_vars...)
@@ -223,7 +441,7 @@ callback = GenericCallbacks.EveryXSimulationTime(
 
     step[1] += 1
     nothing
-end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1">Solve</a><a class="docs-heading-anchor-permalink" href="#Solve-1" title="Permalink"></a></h1><p>This is the main <code>ClimateMachine</code> solver invocation. While users do not have access to the time-stepping loop, code may be injected via <code>user_callbacks</code>, which is a <code>Tuple</code> of <a href="generated/Land/Heat/@ref"><code>GenericCallbacks</code></a>.</p><pre><code class="language-julia">ClimateMachine.invoke!(solver_config; user_callbacks = (callback,))</code></pre><pre><code class="language-none">1.0114708017257072</code></pre><h1 id="Post-processing-1"><a class="docs-heading-anchor" href="#Post-processing-1">Post-processing</a><a class="docs-heading-anchor-permalink" href="#Post-processing-1" title="Permalink"></a></h1><p>Our solution is stored in the nested dictionary <code>all_data</code> whose keys are the output interval. The next level keys are the variable names, and the values are the values along the grid:</p><p>To get <code>T</code> at <span>$t=0$</span>, we can use <code>T_at_t_0 = all_data[0][&quot;T&quot;][:]</code></p><pre><code class="language-julia">@show keys(all_data[0])</code></pre><pre><code class="language-none">Base.KeySet for a Dict{Any,Any} with 3 entries. Keys:
+end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1">Solve</a><a class="docs-heading-anchor-permalink" href="#Solve-1" title="Permalink"></a></h1><p>This is the main <code>ClimateMachine</code> solver invocation. While users do not have access to the time-stepping loop, code may be injected via <code>user_callbacks</code>, which is a <code>Tuple</code> of <a href="generated/Land/Heat/@ref"><code>GenericCallbacks</code></a>.</p><pre><code class="language-julia">ClimateMachine.invoke!(solver_config; user_callbacks = (callback,))</code></pre><pre><code class="language-none">1.0114708017257077</code></pre><h1 id="Post-processing-1"><a class="docs-heading-anchor" href="#Post-processing-1">Post-processing</a><a class="docs-heading-anchor-permalink" href="#Post-processing-1" title="Permalink"></a></h1><p>Our solution is stored in the nested dictionary <code>all_data</code> whose keys are the output interval. The next level keys are the variable names, and the values are the values along the grid:</p><p>To get <code>T</code> at <span>$t=0$</span>, we can use <code>T_at_t_0 = all_data[0][&quot;T&quot;][:]</code></p><pre><code class="language-julia">@show keys(all_data[0])</code></pre><pre><code class="language-none">Base.KeySet for a Dict{Any,Any} with 3 entries. Keys:
   &quot;T&quot;
   &quot;z&quot;
   &quot;ρcT&quot;</code></pre><p>Let&#39;s plot the solution:</p><pre><code class="language-julia">export_plot(
@@ -232,4 +450,4 @@ end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1"
     (&quot;ρcT&quot;,),
     joinpath(output_dir, &quot;solution_vs_time.png&quot;),
     z_label,
-);</code></pre><p><img src="../solution_vs_time.png" alt/></p><p>The results look as we would expect: a fixed temperature at the bottom is resulting in heat flux that propagates up the domain. To run this file, and inspect the solution in <code>all_data</code>, include this tutorial in the Julia REPL with:</p><pre><code class="language-julia">include(joinpath(&quot;tutorials&quot;, &quot;Land&quot;, &quot;Heat&quot;, &quot;heat_equation.jl&quot;))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../Atmos/heldsuarez/">« Dry Idealized GCM</a><a class="docs-footer-nextpage" href="../../../Numerics/LinearSolvers/cg/">Conjugate Gradient »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 15 May 2020 17:18">Friday 15 May 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+);</code></pre><p><img src="../solution_vs_time.png" alt/></p><p>The results look as we would expect: a fixed temperature at the bottom is resulting in heat flux that propagates up the domain. To run this file, and inspect the solution in <code>all_data</code>, include this tutorial in the Julia REPL with:</p><pre><code class="language-julia">include(joinpath(&quot;tutorials&quot;, &quot;Land&quot;, &quot;Heat&quot;, &quot;heat_equation.jl&quot;))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../Atmos/heldsuarez/">« Dry Idealized GCM</a><a class="docs-footer-nextpage" href="../../../Numerics/LinearSolvers/cg/">Conjugate Gradient »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 15 May 2020 17:39">Friday 15 May 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

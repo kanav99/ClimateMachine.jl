@@ -18,6 +18,7 @@ using ClimateMachine.MPIStateArrays
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.VariableTemplates
+using ClimateMachine.SingleStackUtils
 
 import ClimateMachine.DGmethods:
     vars_state_auxiliary,
@@ -41,7 +42,6 @@ ClimateMachine.init(; disable_gpu = true);
 
 const clima_dir = dirname(dirname(pathof(ClimateMachine)));
 
-include(joinpath(clima_dir, "tutorials", "Land", "helper_funcs.jl"));
 include(joinpath(clima_dir, "docs", "plothelpers.jl"));
 
 Base.@kwdef struct HeatModel{FT} <: BalanceLaw
@@ -213,6 +213,9 @@ dt = Fourier_bound
 
 solver_config =
     ClimateMachine.SolverConfiguration(t0, timeend, driver_config, ode_dt = dt);
+grid = solver_config.dg.grid
+Q = solver_config.Q
+aux = solver_config.dg.state_auxiliary
 
 output_dir = @__DIR__;
 
@@ -221,19 +224,17 @@ mkpath(output_dir);
 z_scale = 100 # convert from meters to cm
 z_key = "z"
 z_label = "z [cm]"
-z = get_z(driver_config.grid, z_scale)
-state_vars = get_vars_from_stack(
-    driver_config.grid,
-    solver_config.Q,
-    m,
-    vars_state_conservative,
-);
-aux_vars = get_vars_from_stack(
-    driver_config.grid,
-    solver_config.dg.state_auxiliary,
-    m,
-    vars_state_auxiliary,
-);
+z = get_z(grid, z_scale)
+state_vars = SingleStackUtils.get_vars_from_nodal_stack(
+    grid,
+    Q,
+    vars_state_conservative(m, FT),
+)
+aux_vars = SingleStackUtils.get_vars_from_nodal_stack(
+    grid,
+    aux,
+    vars_state_auxiliary(m, FT),
+)
 all_vars = OrderedDict(state_vars..., aux_vars...);
 export_plot_snapshot(
     z,
@@ -255,17 +256,15 @@ callback = GenericCallbacks.EveryXSimulationTime(
     every_x_simulation_time,
     solver_config.solver,
 ) do (init = false)
-    state_vars = get_vars_from_stack(
-        driver_config.grid,
-        solver_config.Q,
-        m,
-        vars_state_conservative,
+    state_vars = SingleStackUtils.get_vars_from_nodal_stack(
+        grid,
+        Q,
+        vars_state_conservative(m, FT),
     )
-    aux_vars = get_vars_from_stack(
-        driver_config.grid,
-        solver_config.dg.state_auxiliary,
-        m,
-        vars_state_auxiliary;
+    aux_vars = SingleStackUtils.get_vars_from_nodal_stack(
+        grid,
+        aux,
+        vars_state_auxiliary(m, FT);
         exclude = [z_key],
     )
     all_vars = OrderedDict(state_vars..., aux_vars...)
