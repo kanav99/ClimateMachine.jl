@@ -710,6 +710,9 @@ end
         @test all(
             getproperty.(PhasePartition.(ts), :ice) .≈ getproperty.(q_pt, :ice),
         )
+
+        # TODO: Add consistency test for `air_temperature_from_virtual_temperature`:
+        # @test all(T .≈ air_temperature_from_virtual_temperature.(Ref(param_set), T_virt, RH, p))
     end
 
 end

@@ -673,10 +673,10 @@ function saturation_vapor_pressure(
     _cp_v = FT(cp_v(param_set))
     _cp_l = FT(cp_l(param_set))
     _cp_i = FT(cp_i(param_set))
-    liq_frac = liquid_fraction(param_set, T, PhasePartion(FT(0)))
+    liq_frac = liquid_fraction(param_set, T, PhasePartition(FT(0)))
     _LH_0 = liq_frac * _LH_v0 + (1-liq_frac) * _LH_s0
     _Δcp = _cp_v - liq_frac * _cp_l - (1-liq_frac) * _cp_i
-    return saturation_vapor_pressure(T, _LH_0, _Δcp)
+    return saturation_vapor_pressure(param_set, T, _LH_0, _Δcp)
 end
 
 function saturation_vapor_pressure(

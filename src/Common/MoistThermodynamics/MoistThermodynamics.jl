@@ -28,6 +28,7 @@ module MoistThermodynamics
 using DocStringExtensions
 using RootSolvers
 using RootSolvers: AbstractTolerance
+using KernelAbstractions: @print
 
 using CLIMAParameters: AbstractParameterSet
 using CLIMAParameters.Planet

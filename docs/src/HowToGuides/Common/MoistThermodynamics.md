@@ -139,6 +139,8 @@ using Plots
 struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
 FT = Float64;
+include(joinpath(repeat([".."], 4),"test", "Common", "MoistThermodynamics", "profiles.jl"))
+/Users/charliekawczynski/Dropbox/Caltech/work/dev/CliMA/CLIMA/docs/src/HowToGuides/Common/MoistThermodynamics.md
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = tested_profiles(param_set, 50, FT);
 mask_dry = q_tot .≈ 0;
 ρ_dry = ρ[mask_dry];
@@ -159,6 +161,7 @@ using Plots
 struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
 FT = Float64;
+include(joinpath(repeat([".."], 4),"test", "Common", "MoistThermodynamics", "profiles.jl"))
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = tested_profiles(param_set, 50, FT);
 p1 = scatter(ρ, z./10^3, xlabel="Density [kg/m^3]", ylabel="z [km]", title="Density");
 p2 = scatter(T, z./10^3, xlabel="Temperature [K]", ylabel="z [km]", title="Temperature");
@@ -167,7 +170,3 @@ plot(p1, p2, p3, layout=(1,3))
 savefig("tested_profiles_virt_temp.svg")
 ```
 ![](tested_profiles_virt_temp.svg)
-
-### Moist Phase in thermodynamic non-equilibrium
-
-In progress...
