@@ -141,12 +141,28 @@ specific_volume(ts::ThermodynamicState) = 1 / air_density(ts)
 
 """
     total_specific_humidity(ts::ThermodynamicState)
+    total_specific_humidity(param_set, T, p, relative_humidity)
 
-Total specific humidity, given a thermodynamic state `ts`.
+Total specific humidity given
+ - `ts` a thermodynamic state
+or
+ - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `T` temperature
+ - `p` pressure
+ - `relative_humidity` relative humidity (can exceed 1 when there is super saturation/condensate)
 """
 total_specific_humidity(ts::ThermodynamicState) = ts.q_tot
 total_specific_humidity(ts::PhaseDry{FT}) where {FT} = FT(0)
 total_specific_humidity(ts::PhaseNonEquil) = ts.q.tot
+
+function total_specific_humidity(param_set, T, p, relative_humidity)
+    _R_d = FT(R_d(param_set))
+    _R_v = FT(R_v(param_set))
+    ε_dv = _R_d/_R_v
+    p_vap_sat = saturation_vapor_pressure(param_set, T)
+    excess_RH = max(relative_humidity, 1)
+    return ε_dv*relative_humidity*p_vap_sat/(p - p_vap_sat*relative_humidity*(1 - ε_dv*excess_RH))
+end
 
 """
     cp_m(param_set, [q::PhasePartition])
@@ -646,6 +662,21 @@ function saturation_vapor_pressure(
         _LH_s0,
         _cp_v - _cp_i,
     )
+end
+
+function saturation_vapor_pressure(
+    param_set::APS,
+    T::FT,
+) where {FT <: Real}
+    _LH_s0 = FT(LH_s0(param_set))
+    _LH_v0 = FT(LH_v0(param_set))
+    _cp_v = FT(cp_v(param_set))
+    _cp_l = FT(cp_l(param_set))
+    _cp_i = FT(cp_i(param_set))
+    liq_frac = liquid_fraction(param_set, T, PhasePartion(FT(0)))
+    _LH_0 = liq_frac * _LH_v0 + (1-liq_frac) * _LH_s0
+    _Δcp = _cp_v - liq_frac * _cp_l - (1-liq_frac) * _cp_i
+    return saturation_vapor_pressure(T, _LH_0, _Δcp)
 end
 
 function saturation_vapor_pressure(
@@ -1317,6 +1348,50 @@ dry_pottemp(ts::ThermodynamicState) = dry_pottemp(
 )
 
 """
+    air_temperature_from_virtual_temperature(param_set, T_virt, RH, p)
+
+The air temperature and `q_tot` where
+
+ - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `T_virt` virtual temperature
+ - `RH` relative humidity
+ - `p` air pressure
+"""
+function air_temperature_from_virtual_temperature(
+    param_set::APS,
+    T_virt::FT,
+    RH::FT,
+    p::FT,
+    tol::AbstractTolerance,
+    maxiter::Int,
+) where {FT <: Real}
+
+    _T_min::FT = T_min(param_set)
+    _T_max::FT = T_max(param_set)
+    function air_temp(param_set, T_virt, T, RH, p)
+        _R_d = FT(R_d(param_set))
+        _R_v = FT(R_v(param_set))
+        ρ = p/(_R_d*T_virt)
+        q_tot = total_specific_humidity(param_set, T, p, RH)
+        q_pt = PhasePartition_equil(param_set, T, ρ, q_tot)
+        R_m = gas_constant_air(param_set, q_pt)
+        return _R_d/R_m*T_virt
+    end
+
+    sol = find_zero(T -> T - air_temp(param_set, T_virt, T, RH, p),
+        SecantMethod(_T_min, _T_max),
+        CompactSolution(),
+        SolutionTolerance(tol),
+        maxiter,
+    )
+    if !sol.converged
+        @print("maxiter reached in air_temperature_from_virtual_temperature. Please open an issue with gist of these values:\n")
+        @print("    T_virt=",T_virt, "RH=",RH, ", p=",p, ", maxiter=",maxiter, ", tol=",tol,"\n")
+    end
+
+end
+
+"""
     air_temperature_from_liquid_ice_pottemp(param_set, θ_liq_ice, ρ, q::PhasePartition)
 
 The temperature given
@@ -1583,10 +1658,7 @@ function relative_humidity(
         air_density(param_set, T, p, q) *
         _R_v *
         air_temperature(param_set, e_int, q)
-    liq_frac = liquid_fraction(param_set, T, q)
-    p_vap_sat =
-        liq_frac * saturation_vapor_pressure(param_set, T, Liquid()) +
-        (1 - liq_frac) * saturation_vapor_pressure(param_set, T, Ice())
+    p_vap_sat = saturation_vapor_pressure(param_set, T)
     return p_vap / p_vap_sat
 end
 
