@@ -213,9 +213,9 @@ dt = Fourier_bound
 
 solver_config =
     ClimateMachine.SolverConfiguration(t0, timeend, driver_config, ode_dt = dt);
-grid = solver_config.dg.grid
-Q = solver_config.Q
-aux = solver_config.dg.state_auxiliary
+grid = solver_config.dg.grid;
+Q = solver_config.Q;
+aux = solver_config.dg.state_auxiliary;
 
 output_dir = @__DIR__;
 
@@ -274,7 +274,7 @@ callback = GenericCallbacks.EveryXSimulationTime(
     nothing
 end;
 
-ClimateMachine.invoke!(solver_config; user_callbacks = (callback,))
+ClimateMachine.invoke!(solver_config; user_callbacks = (callback,));
 
 @show keys(all_data[0])
 
