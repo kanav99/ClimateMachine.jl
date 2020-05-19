@@ -6,7 +6,7 @@ using ClimateMachine.VariableTemplates
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.StateCheck
 if !MPI.Initialized()
- MPI.Init()
+    MPI.Init()
 end
 FT = Float64
 
