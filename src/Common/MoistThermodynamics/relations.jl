@@ -165,6 +165,33 @@ function total_specific_humidity(param_set, T, p, relative_humidity)
 end
 
 """
+    vapor_specific_humidity(
+        param_set::AbstractParameterSet,
+        T::FT,
+        p::FT,
+        RH::FT
+        ) where {FT<:AbstractFloat}
+
+Vapor specific humidity, given
+ - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `T` air temperature
+ - `p` pressure
+ - `RH` relative humidity
+"""
+function vapor_specific_humidity(
+        param_set::AbstractParameterSet,
+        T::FT,
+        p::FT,
+        RH::FT
+        ) where {FT<:AbstractFloat}
+    _R_d = FT(R_d(param_set))
+    _R_v = FT(R_v(param_set))
+    ε_dv = _R_d/_R_v
+    p_vap_sat = saturation_vapor_pressure(param_set, T)
+    return RH*p_vap_sat*ε_dv/(p - RH*p_vap_sat*(1 - ε_dv))
+end
+
+"""
     cp_m(param_set, [q::PhasePartition])
 
 The isobaric specific heat capacity of moist air given
@@ -1372,8 +1399,9 @@ function air_temperature_from_virtual_temperature(
         _R_d = FT(R_d(param_set))
         _R_v = FT(R_v(param_set))
         ρ = p/(_R_d*T_virt)
-        q_tot = total_specific_humidity(param_set, T, p, RH)
-        q_pt = PhasePartition_equil(param_set, T, ρ, q_tot)
+        # q_tot = total_specific_humidity(param_set, T, p, RH)
+        q_vap = vapor_specific_humidity(param_set, T, p, RH)
+        q_pt = PhasePartition_equil(param_set, T, ρ, q_vap)
         R_m = gas_constant_air(param_set, q_pt)
         return _R_d/R_m*T_virt
     end
