@@ -5,9 +5,7 @@ using ClimateMachine
 using ClimateMachine.VariableTemplates
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.StateCheck
-if !MPI.Initialized()
-    MPI.Init()
-end
+ClimateMachine.init()
 FT = Float64
 
 F1 = @vars begin
