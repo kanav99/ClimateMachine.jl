@@ -54,7 +54,7 @@ function init_risingbubble!(bl, state, aux, (x, y, z), t)
     θ = θ_ref + Δθ                                      # potential temperature
     π_exner = FT(1) - _grav / (c_p * θ) * z             # exner pressure
     ρ = p0 / (R_gas * θ) * (π_exner)^(c_v / R_gas)      # density
-    T = θ*π_exner
+    T = θ * π_exner
     e_int = internal_energy(bl.param_set, T)
     ts = PhaseDry(bl.param_set, e_int, ρ)
     ρu = SVector(FT(0), FT(0), FT(0))                   # momentum
