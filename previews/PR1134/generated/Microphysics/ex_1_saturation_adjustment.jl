@@ -93,13 +93,8 @@ function kinematic_model_nodal_update_auxiliary_state!(
 
     q = PhasePartition(aux.q_tot, aux.q_liq, aux.q_ice)
     ts_neq = TemperatureSHumNonEquil(param_set, aux.T, state.ρ, q)
-    aux.S =
-        max(
-            0,
-            aux.q_vap / q_vap_saturation(ts_neq) - FT(1),
-        ) * FT(100)
-    aux.RH =
-        aux.q_vap / q_vap_saturation(ts_neq) * FT(100)
+    aux.S = max(0, aux.q_vap / q_vap_saturation(ts_neq) - FT(1)) * FT(100)
+    aux.RH = aux.q_vap / q_vap_saturation(ts_neq) * FT(100)
 end
 
 function boundary_state!(

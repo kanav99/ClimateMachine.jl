@@ -106,13 +106,8 @@ function kinematic_model_nodal_update_auxiliary_state!(
     q = PhasePartition(aux.q_tot, aux.q_liq, aux.q_ice)
     aux.T = air_temperature(param_set, aux.e_int, q)
     ts_neq = TemperatureSHumNonEquil(param_set, aux.T, state.ρ, q)
-    aux.S =
-        max(
-            0,
-            aux.q_vap / q_vap_saturation(ts_neq) - FT(1),
-        ) * FT(100)
-    aux.RH =
-        aux.q_vap / q_vap_saturation(ts_neq) * FT(100)
+    aux.S = max(0, aux.q_vap / q_vap_saturation(ts_neq) - FT(1)) * FT(100)
+    aux.RH = aux.q_vap / q_vap_saturation(ts_neq) * FT(100)
 
     aux.rain_w = terminal_velocity(param_set, aux.q_rai, state.ρ)
 

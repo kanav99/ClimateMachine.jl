@@ -14,7 +14,8 @@ using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.Mesh.Filters
-using ClimateMachine.MoistThermodynamics: TemperatureSHumEquil_given_pressure, internal_energy
+using ClimateMachine.MoistThermodynamics:
+    TemperatureSHumEquil_given_pressure, internal_energy
 using ClimateMachine.VariableTemplates
 
 using CLIMAParameters
