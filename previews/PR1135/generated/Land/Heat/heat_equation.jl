@@ -182,7 +182,7 @@ function boundary_state!(
     if bctype == 1 # bottom
         state⁺.ρcT = m.ρc * m.T_bottom
     elseif bctype == 2 # top
-        diff⁺.α∇ρcT = -n⁻ * m.flux_top
+        diff⁺.α∇ρcT = n⁻ * m.flux_top
     end
 end;
 
