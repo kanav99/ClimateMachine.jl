@@ -8,21 +8,23 @@ tested with in runtests.jl
 
 
 """
-    fixed_lapse_rate(
+    temperature_and_pressure(
         param_set::AbstractParameterSet,
         z::FT,
         T_surface::FT,
         T_min::FT,
         ) where {FT <: AbstractFloat}
 
-Fixed lapse rate hydrostatic reference state given
+Returns dry adiabatic linear temperature profile truncated at
+a minimum temperature `T_min` and the corresponding pressure
+profile for dry atmosphere.
 
  - `param_set` parameter set, used to dispatch planet parameter function calls
  - `z` altitude
  - `T_surface` surface temperature
  - `T_min` minimum temperature
 """
-function fixed_lapse_rate(
+function temperature_and_pressure(
     param_set::AbstractParameterSet,
     z::FT,
     T_surface::FT,
@@ -38,8 +40,7 @@ function fixed_lapse_rate(
     T = max(T_surface - Γ * z, T_min)
     p = _MSLP * (T / T_surface)^(_grav / (_R_d * Γ))
     T == T_min && (p = p * exp(-(z - z_tropopause) / H_min))
-    ρ = p / (_R_d * T)
-    return T, p, ρ
+    return T, p
 end
 
 """
@@ -84,24 +85,32 @@ function tested_profiles(
     z_all = zeros(FT, n, n_RS)
     for i in eachindex(z_range)
         for j in eachindex(relative_sat)
-            args = fixed_lapse_rate(param_set, z_range[i], T_surface, T_min)
+            args = temperature_and_pressure(param_set, z_range[i], T_surface, T_min)
             k = CartesianIndex(i, j)
             z_all[k] = z_range[i]
             T[k] = args[1]
             p[k] = args[2]
-            ρ[k] = args[3]
             RS[k] = relative_sat[j]
         end
     end
     T = reshape(T, n * n_RS)
     p = reshape(p, n * n_RS)
-    ρ = reshape(ρ, n * n_RS)
     RS = reshape(RS, n * n_RS)
-    relative_sat = RS
 
+    # Compute the vapor specific humidity given the temperature,
+    # pressure and relative humidity, and use that as the total
+    # specific humidity.
+    # This is exact when `RS <= 1` and gives super-saturated states
+    # with non-zero condensate for `RS > 1`. In the latter case,
+    # the density is only approximate.
+    q_tot = vapor_specific_humidity.(Ref(param_set), T, p, RS)
+    q_liq = max.(Ref(0), RS .- 1) .* q_tot
+    q_pt = PhasePartition.(q_tot, q_liq, Ref(FT(0)))
+    R_m = gas_constant_air.(Ref(param_set), q_pt)
+    ρ = p ./ (R_m .* T)
     # Additional variables
     q_sat = q_vap_saturation.(Ref(param_set), T, ρ)
-    q_tot = min.(relative_sat .* q_sat, FT(1))
+    q_tot = min.(RS .* q_sat, FT(1))
     q_pt = PhasePartition_equil.(Ref(param_set), T, ρ, q_tot)
     e_int = internal_energy.(Ref(param_set), T, q_pt)
     θ_liq_ice = liquid_ice_pottemp.(Ref(param_set), T, ρ, q_pt)
