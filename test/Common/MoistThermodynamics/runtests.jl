@@ -53,7 +53,7 @@ include("data_tests.jl")
         _kappa_d = FT(kappa_d(param_set))
 
         # for FT in float_types
-        z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
+        z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
             tested_profiles(param_set, 50, FT)
         Φ = FT(1)
         Random.seed!(15)
@@ -342,7 +342,7 @@ end
 
     for FT in float_types
         rtol = FT(1e-2)
-        z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
+        z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
             tested_profiles(param_set, 50, FT)
 
         # PhaseEquil
@@ -540,7 +540,7 @@ end
 
         _MSLP = FT(MSLP(param_set))
 
-        z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
+        z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
             tested_profiles(param_set, 50, FT)
 
         # PhaseDry
@@ -711,8 +711,42 @@ end
             getproperty.(PhasePartition.(ts), :ice) .≈ getproperty.(q_pt, :ice),
         )
 
+        T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
+        RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
+        q_c = getproperty.(q_pt, :liq) .+ getproperty.(q_pt, :ice)
+        # mask = RS .< 1
+        mask = RH .< 0.9
+        N = 5
+        R_m = gas_constant_air.(Ref(param_set), q_pt)
+        _R_d = FT(R_d(param_set))
+        R_m_mask = R_m[mask][1:N]
+        q_tot_mask = q_tot[mask][1:N]
+        T_mask = T[mask][1:N]
+        T_virt_mask = T_virt[mask][1:N]
+        p_mask = p[mask][1:N]
+        RH_mask = RH[mask][1:N]
+        @show R_m_mask / _R_d .* T_mask
+        @show R_m_mask / _R_d
+        @show T_virt_mask
+        @show T_mask
+        @show q_tot_mask
+        @show p_mask
+        @show RH_mask
         # TODO: Add consistency test for `air_temperature_from_virtual_temperature`:
-        # @test all(T .≈ air_temperature_from_virtual_temperature.(Ref(param_set), T_virt, RH, p))
+
+        T_from_virt = air_temperature_from_virtual_temperature.(
+            Ref(param_set),
+            T_virt_mask,
+            p_mask,
+            RH_mask,
+            Ref(ResidualTolerance(FT(1e-2))),
+            Ref(10)
+            )
+
+        # @test all(T_mask .≈ T_from_virt)
+        @show T_from_virt
+        @show T_mask
+        @show T_mask .- T_from_virt
     end
 
 end
@@ -723,7 +757,7 @@ end
     # NOTE: `Float32` saturation adjustment tends to have more difficulty
     # with converging to the same tolerances as `Float64`, so they're relaxed here.
     FT = Float32
-    z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
+    z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
         tested_profiles(param_set, 50, FT)
 
     ρu = FT[1.0, 2.0, 3.0]
@@ -814,7 +848,7 @@ end
 @testset "moist thermodynamics - dry limit" begin
 
     FT = Float64
-    z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
+    z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
         tested_profiles(param_set, 50, FT)
 
     # PhasePartition test is noisy, so do this only once:

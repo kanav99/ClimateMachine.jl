@@ -31,7 +31,9 @@ export liquid_ice_pottemp,
 export air_temperature_from_liquid_ice_pottemp,
     air_temperature_from_liquid_ice_pottemp_given_pressure
 export air_temperature_from_liquid_ice_pottemp_non_linear
+export air_temperature_from_virtual_temperature
 export vapor_specific_humidity
+export virtual_temperature
 
 """
     gas_constant_air(param_set, [q::PhasePartition])
@@ -155,15 +157,6 @@ total_specific_humidity(ts::ThermodynamicState) = ts.q_tot
 total_specific_humidity(ts::PhaseDry{FT}) where {FT} = FT(0)
 total_specific_humidity(ts::PhaseNonEquil) = ts.q.tot
 
-function total_specific_humidity(param_set, T, p, relative_humidity)
-    _R_d = FT(R_d(param_set))
-    _R_v = FT(R_v(param_set))
-    ε_dv = _R_d/_R_v
-    p_vap_sat = saturation_vapor_pressure(param_set, T)
-    excess_RH = max(relative_humidity, 1)
-    return ε_dv*relative_humidity*p_vap_sat/(p - p_vap_sat*relative_humidity*(1 - ε_dv*excess_RH))
-end
-
 """
     vapor_specific_humidity(
         param_set::AbstractParameterSet,
@@ -186,9 +179,9 @@ function vapor_specific_humidity(
         ) where {FT<:AbstractFloat}
     _R_d = FT(R_d(param_set))
     _R_v = FT(R_v(param_set))
-    ε_dv = _R_d/_R_v
+    ε_vd = _R_d/_R_v
     p_vap_sat = saturation_vapor_pressure(param_set, T)
-    return RH*p_vap_sat*ε_dv/(p - RH*p_vap_sat*(1 - ε_dv))
+    return RH*p_vap_sat*ε_vd/(p - RH*p_vap_sat*(1 - ε_vd))
 end
 
 """
@@ -1375,47 +1368,48 @@ dry_pottemp(ts::ThermodynamicState) = dry_pottemp(
 )
 
 """
-    air_temperature_from_virtual_temperature(param_set, T_virt, RH, p)
+    air_temperature_from_virtual_temperature(param_set, T_virt, p, RH)
 
 The air temperature and `q_tot` where
 
  - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
  - `T_virt` virtual temperature
- - `RH` relative humidity
  - `p` air pressure
+ - `RH` relative humidity
 """
 function air_temperature_from_virtual_temperature(
     param_set::APS,
     T_virt::FT,
-    RH::FT,
     p::FT,
+    RH::FT,
     tol::AbstractTolerance,
     maxiter::Int,
 ) where {FT <: Real}
 
-    _T_min::FT = T_min(param_set)
-    _T_max::FT = T_max(param_set)
-    function air_temp(param_set, T_virt, T, RH, p)
+    _T_min::FT = T_virt - 5
+    _T_max::FT = T_virt
+    function air_temp(param_set, T_virt, T, p, RH)
         _R_d = FT(R_d(param_set))
         _R_v = FT(R_v(param_set))
         ρ = p/(_R_d*T_virt)
-        # q_tot = total_specific_humidity(param_set, T, p, RH)
         q_vap = vapor_specific_humidity(param_set, T, p, RH)
-        q_pt = PhasePartition_equil(param_set, T, ρ, q_vap)
+        q_tot = q_vap
+        q_pt = PhasePartition_equil(param_set, T, ρ, q_tot)
         R_m = gas_constant_air(param_set, q_pt)
         return _R_d/R_m*T_virt
     end
 
-    sol = find_zero(T -> T - air_temp(param_set, T_virt, T, RH, p),
+    sol = find_zero(T -> T - air_temp(param_set, T_virt, T, p, RH),
         SecantMethod(_T_min, _T_max),
         CompactSolution(),
-        SolutionTolerance(tol),
+        tol,
         maxiter,
     )
     if !sol.converged
         @print("maxiter reached in air_temperature_from_virtual_temperature. Please open an issue with gist of these values:\n")
         @print("    T_virt=",T_virt, "RH=",RH, ", p=",p, ", maxiter=",maxiter, ", tol=",tol,"\n")
     end
+    return sol.root
 
 end
 
@@ -1520,7 +1514,7 @@ end
 """
     virtual_pottemp(param_set, T, ρ[, q::PhasePartition])
 
-The virtual temperature where
+The virtual potential temperature where
 
  - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
  - `T` temperature
@@ -1551,6 +1545,41 @@ virtual_pottemp(ts::ThermodynamicState) = virtual_pottemp(
     air_density(ts),
     PhasePartition(ts),
 )
+
+"""
+    virtual_temperature(param_set, T, ρ[, q::PhasePartition])
+
+The virtual temperature where
+
+ - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `T` temperature
+ - `ρ` (moist-)air density
+and, optionally,
+ - `q` [`PhasePartition`](@ref). Without this argument, the results are for dry air.
+"""
+function virtual_temperature(
+    param_set::APS,
+    T::FT,
+    ρ::FT,
+    q::PhasePartition{FT} = q_pt_0(FT),
+) where {FT <: Real}
+    _R_d::FT = R_d(param_set)
+    return gas_constant_air(param_set, q) / _R_d * T
+end
+
+"""
+    virtual_temperature(ts::ThermodynamicState)
+
+The virtual temperature,
+given a thermodynamic state `ts`.
+"""
+virtual_temperature(ts::ThermodynamicState) = virtual_temperature(
+    ts.param_set,
+    air_temperature(ts),
+    air_density(ts),
+    PhasePartition(ts),
+)
+
 
 """
     liquid_ice_pottemp_sat(param_set, T, ρ[, q::PhasePartition])

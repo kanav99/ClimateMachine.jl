@@ -111,19 +111,20 @@ function tested_profiles(
     # https://github.com/JuliaLang/julia/pull/33515 merges
     q_liq = getproperty.(q_pt, :liq)
     q_ice = getproperty.(q_pt, :ice)
-    args = [z_all, e_int, ρ, q_tot, q_liq, q_ice, T, p, θ_liq_ice]
+    args = [z_all, RS, e_int, ρ, q_tot, q_liq, q_ice, T, p, θ_liq_ice]
     args = collect(zip(args...))
     sort!(args)
-    z_all = getindex.(args, 1)
-    e_int = getindex.(args, 2)
-    ρ = getindex.(args, 3)
-    q_tot = getindex.(args, 4)
-    q_liq = getindex.(args, 5)
-    q_ice = getindex.(args, 6)
-    T = getindex.(args, 7)
-    p = getindex.(args, 8)
-    θ_liq_ice = getindex.(args, 9)
+    z_all     = getindex.(args, 1)
+    RS        = getindex.(args, 2)
+    e_int     = getindex.(args, 3)
+    ρ         = getindex.(args, 4)
+    q_tot     = getindex.(args, 5)
+    q_liq     = getindex.(args, 6)
+    q_ice     = getindex.(args, 7)
+    T         = getindex.(args, 8)
+    p         = getindex.(args, 9)
+    θ_liq_ice = getindex.(args, 10)
     q_pt = PhasePartition.(q_tot, q_liq, q_ice)
-    args = [z_all, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice]
+    args = [z_all, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice]
     return args
 end
