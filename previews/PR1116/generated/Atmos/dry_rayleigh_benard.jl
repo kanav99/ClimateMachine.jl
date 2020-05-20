@@ -22,8 +22,6 @@ using CLIMAParameters.Planet: R_d, cp_d, cv_d, grav, MSLP
 struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
 
-const randomseed = MersenneTwister(1)
-
 struct DryRayleighBenardConvectionDataConfig{FT}
     xmin::FT
     ymin::FT
@@ -49,10 +47,10 @@ function init_problem!(bl, state, aux, (x, y, z), t)
     γ::FT = _cp_d / _cv_d
     δT =
         sinpi(6 * z / (dc.zmax - dc.zmin)) *
-        cospi(6 * z / (dc.zmax - dc.zmin)) + rand(randomseed)
+        cospi(6 * z / (dc.zmax - dc.zmin)) + rand()
     δw =
         sinpi(6 * z / (dc.zmax - dc.zmin)) *
-        cospi(6 * z / (dc.zmax - dc.zmin)) + rand(randomseed)
+        cospi(6 * z / (dc.zmax - dc.zmin)) + rand()
     ΔT = _grav / _cv_d * z + δT
     T = dc.T_bot - ΔT
     P = _MSLP * (T / dc.T_bot)^(_grav / _R_d / dc.T_lapse)
