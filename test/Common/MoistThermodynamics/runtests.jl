@@ -472,7 +472,7 @@ end
         @test all(isapprox.(
             internal_energy.(ts),
             internal_energy.(ts_exact),
-            rtol = rtol,
+            rtol = 5rtol,
         ))
         @test all(isapprox.(
             liquid_ice_pottemp.(ts),
@@ -535,7 +535,7 @@ end
 
     # Make sure `ThermodynamicState` arguments are returned unchanged
 
-    for FT in float_types
+    for FT in [Float64,]
         rtol = FT(1e-2)
 
         _MSLP = FT(MSLP(param_set))
@@ -711,11 +711,10 @@ end
             getproperty.(PhasePartition.(ts), :ice) .≈ getproperty.(q_pt, :ice),
         )
 
+
         T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
         RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
-        q_c = getproperty.(q_pt, :liq) .+ getproperty.(q_pt, :ice)
-        # mask = RS .< 1
-        mask = RH .< 0.9
+        mask = RH .< 1
         N = 5
         R_m = gas_constant_air.(Ref(param_set), q_pt)
         _R_d = FT(R_d(param_set))
@@ -733,6 +732,14 @@ end
         @show p_mask
         @show RH_mask
         # TODO: Add consistency test for `air_temperature_from_virtual_temperature`:
+
+        q_vap_mask = vapor_specific_humidity.(Ref(param_set), T_mask, p_mask, RH_mask)
+        println("---------")
+        @show q_tot_mask
+        @show q_vap_mask
+        println("---------")
+        @test all(isapprox.(q_tot_mask, q_vap_mask, rtol=rtol))
+
 
         T_from_virt = air_temperature_from_virtual_temperature.(
             Ref(param_set),
