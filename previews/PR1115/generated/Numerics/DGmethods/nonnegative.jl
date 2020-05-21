@@ -214,7 +214,7 @@ let
     dt = CFL * dx / maxvelocity
 
     vtkdir = abspath(joinpath(
-        ClimateMachine.Settings.output_path,
+        ClimateMachine.Settings.output_dir,
         "vtk_nonnegative",
     ))
     outputtime = 0.0625
