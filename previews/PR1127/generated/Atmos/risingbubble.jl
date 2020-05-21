@@ -40,17 +40,18 @@ function init_risingbubble!(bl, state, aux, (x, y, z), t)
     _grav::FT = grav(bl.param_set)
     γ::FT = c_p / c_v
 
-    xc::FT = 1250
-    yc::FT = 1250
-    zc::FT = 1000
-    r = sqrt((x - xc)^2 + (y - yc)^2 + (z - zc)^2)
-    rc::FT = 500
+    xc::FT = 5000
+    yc::FT = 1000
+    zc::FT = 2000
+    r = sqrt((x - xc)^2 + (z - zc)^2)
+    rc::FT = 2000
+    θamplitude::FT = 2
 
     θ_ref::FT = bl.ref_state.virtual_temperature_profile.T_surface
-    Δθ::FT = 0
 
+    Δθ::FT = 0
     if r <= rc
-        Δθ = FT(5) * cospi(r / rc / 2)
+        Δθ = θamplitude * (1.0 - r / rc)
     end
 
     θ = θ_ref + Δθ                                      # potential temperature
@@ -81,15 +82,6 @@ function init_risingbubble!(bl, state, aux, (x, y, z), t)
     state.tracers.ρχ = ρχ
 end
 
- #md # !!! note
- #md #     Docs on model subcomponent options can be found here:
- #md #     - [`param_set`](https://CliMA.github.io/CLIMAParameters.jl/latest/)
- #md #     - `turbulence`
- #md #     - `hyperdiffusion`
- #md #     - `source`
- #md #     - `tracers`
- #md #     - `init_state`
-
 function config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
 
     ode_solver = ClimateMachine.MultirateSolverType(
@@ -110,6 +102,15 @@ function config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
     T_min_ref = FT(0)
     T_profile = DryAdiabaticProfile{FT}(param_set, T_surface, T_min_ref)
     ref_state = HydrostaticState(T_profile)
+
+    #md # !!! note
+    #md #     Docs on model subcomponent options can be found here:
+    #md #     - [`param_set`](https://CliMA.github.io/CLIMAParameters.jl/latest/)
+    #md #     - `turbulence`
+    #md #     - `hyperdiffusion`
+    #md #     - `source`
+    #md #     - `tracers`
+    #md #     - `init_state`
 
     _C_smag = FT(C_smag(param_set))
     model = AtmosModel{FT}(
@@ -150,15 +151,20 @@ function main()
     FT = Float64
 
     N = 4
-    Δh = FT(50)
-    Δv = FT(50)
+    Δh = FT(125)
+    Δv = FT(125)
     resolution = (Δh, Δh, Δv)
-    xmax = FT(2500)
-    ymax = FT(2500)
-    zmax = FT(2500)
+    xmax = FT(10000)
+    ymax = FT(500)
+    zmax = FT(10000)
     t0 = FT(0)
     timeend = FT(1000)
-    CFL = FT(20)
+
+    #Use up to 20 if ode_solver is the multi-rate LRRK144
+    CFL = FT(15)
+
+    #Use up to 1.7 if ode_solver is the single rate LSRK144
+    CFL = FT(1.7)
 
     driver_config = config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
     solver_config = ClimateMachine.SolverConfiguration(
