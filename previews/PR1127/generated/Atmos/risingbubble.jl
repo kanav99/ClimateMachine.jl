@@ -84,16 +84,11 @@ end
 
 function config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
 
-    ode_solver = ClimateMachine.MultirateSolverType(
-        linear_model = AtmosAcousticGravityLinearModel,
-        slow_method = LSRK144NiegemannDiehlBusch,
-        fast_method = LSRK144NiegemannDiehlBusch,
-        timestep_ratio = 10,
-    )
-
     ode_solver = ClimateMachine.ExplicitSolverType(
         solver_method = LSRK144NiegemannDiehlBusch,
     )
+
+    #See ODESolvers for all of the available solvers.
 
     ntracers = 4
     δ_χ = SVector{ntracers, FT}(1, 2, 3, 4)
