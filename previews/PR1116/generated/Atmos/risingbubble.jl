@@ -13,6 +13,8 @@ using ClimateMachine.ODESolvers
 
 using ClimateMachine.Mesh.Filters
 
+using ClimateMachine.TemperatureProfiles
+
 using ClimateMachine.MoistThermodynamics
 
 using ClimateMachine.VariableTemplates
