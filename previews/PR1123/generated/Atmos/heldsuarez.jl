@@ -9,6 +9,7 @@ using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.Mesh.Grids
 using ClimateMachine.Mesh.Filters
+using ClimateMachine.TemperatureProfiles
 using ClimateMachine.MoistThermodynamics
 using ClimateMachine.VariableTemplates
 
@@ -66,7 +67,7 @@ function held_suarez_forcing!(
     φ = latitude(balance_law.orientation, aux)
     p = air_pressure(balance_law.param_set, T, ρ)
 
-    ##TODO: replace _p0 with dynamic surfce pressure in Δσ calculations to
+    ##TODO: replace _p0 with dynamic surface pressure in Δσ calculations to
     #account for topography, but leave unchanged for calculations of σ involved
     #in T_equil
     _p0 = 1.01325e5
@@ -105,11 +106,8 @@ nothing # hide
 FT = Float32
 nothing # hide
 
-T_surface = FT(290) ## surface temperature (K)
-ΔT = FT(60)  ## temperature drop between surface and top of atmosphere (K)
-H_t = FT(8e3) ## height scale over which temperature drops (m)
-temp_profile_ref = DecayingTemperatureProfile(T_surface, ΔT, H_t)
-ref_state = HydrostaticState(temp_profile_ref, FT(0))
+temp_profile_ref = DecayingTemperatureProfile{FT}(param_set)
+ref_state = HydrostaticState(temp_profile_ref)
 nothing # hide
 
 domain_height = FT(30e3)               ## height of the computational domain (m)
