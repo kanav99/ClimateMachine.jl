@@ -1,14 +1,11 @@
-# # Single stack test
+# # Single stack test based on the 3D Burgers + tracer equations
 
 # Equations solved:
 
 # ``
 # Balance law form:
-# \frac{∂ F}{∂ t} + ∇ ⋅ (F) = S
-# \frac{∂ F}{∂ t} = - ∇ ⋅ (F) + S
-
 # \frac{∂ ρ}{∂ t} = - ∇ ⋅ (ρu)
-# \frac{∂ ρu}{∂ t} = - ∇ ⋅ (-μ ∇u) - ∇ ⋅ (ρu u')
+# \frac{∂ ρu}{∂ t} = - ∇ ⋅ (-μ ∇u) - ∇ ⋅ (ρu u') - γ[ (ρu-ρ̄ū) + (ρu-ρ̄ū)⋅ẑ ẑ]
 # \frac{∂ ρcT}{∂ t} = - ∇ ⋅ (-α ∇ρcT) - ∇ ⋅ (u ρcT)
 
 # z_min: ρ = 1
@@ -25,7 +22,8 @@
 # where
 #  - `t` is time
 #  - `α` is the thermal diffusivity
-#  - `μ` is the dynamic viscosity
+#  - `μ` is the dynamic viscosity tensor
+#  - `γ` is the Rayleigh friction frequency
 #  - `T` is the temperature
 #  - `ρ` is the density
 #  - `c` is the heat capacity
@@ -55,6 +53,7 @@ using NCDatasets
 using OrderedCollections
 using Plots
 using StaticArrays
+using LinearAlgebra: Diagonal
 
 #  - load CLIMAParameters and set up to use it:
 
@@ -74,6 +73,7 @@ using ClimateMachine.MPIStateArrays
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.VariableTemplates
+using ClimateMachine.SingleStackUtils
 
 #  - import necessary ClimateMachine modules: (`import`ing enables us to
 #  provide implementations of these structs/methods)
@@ -118,12 +118,16 @@ Base.@kwdef struct SingleStack{FT} <: BalanceLaw
     param_set::AbstractParameterSet = param_set
     "Heat capacity"
     c::FT = 1
-    "Dynamic viscosity"
-    μ::FT = 0.001
+    "Vertical dynamic viscosity"
+    μv::FT = 1e-4
+    "Horizontal dynamic viscosity"
+    μh::FT = 1e-2
     "Thermal diffusivity"
     α::FT = 0.01
-    "IC variance"
-    σ::FT = 1e-4
+    "IC Gaussian noise standard deviation"
+    σ::FT = 1e-1
+    "Rayleigh damping"
+    γ::FT = μh/0.08/1e-2/1e-2;
     "Domain height"
     zmax::FT = 1
     "Initial conditions for temperature"
@@ -174,8 +178,8 @@ end;
 
 # Specify the initial values in `state::Vars`. Note that
 # - this method is only called at `t=0`
-# - `state.ρcT` is available here because we've specified `ρcT` in
-# `vars_state_conservative`
+# - `state.ρcT`, `state.ρ`, ... are available here because we've 
+# specified `ρcT` in `vars_state_conservative`
 function init_state_conservative!(
     m::SingleStack,
     state::Vars,
@@ -225,9 +229,9 @@ function heat_eq_nodal_update_aux!(
 end;
 
 # Since we have second-order fluxes, we must tell `ClimateMachine` to compute
-# the gradient of `ρcT`. Here, we specify how `ρcT` is computed. Note that
-#  - `transform.ρcT` is available here because we've specified `ρcT` in
-#  `vars_state_gradient`
+# the gradient of `ρcT` and `u`. Here, we specify how `ρcT`, `u` are computed. Note that
+#  - `transform.ρcT` and `transform.u` are available here because we've specified `ρcT` 
+# and `u`in `vars_state_gradient`
 function compute_gradient_argument!(
     m::SingleStack,
     transform::Vars,
@@ -241,10 +245,11 @@ end;
 
 # Specify where in `diffusive::Vars` to store the computed gradient from
 # `compute_gradient_argument!`. Note that:
-#  - `diffusive.α∇ρcT` is available here because we've specified `α∇ρcT` in
+#  - e.g., `diffusive.α∇ρcT` is available here because we've specified `α∇ρcT` in
 #  `vars_state_gradient_flux`
-#  - `∇transform.ρcT` is available here because we've specified `ρcT`  in
+#  - e.g., `∇transform.ρcT` is available here because we've specified `ρcT`  in
 #  `vars_state_gradient`
+#  - `diffusive.μ∇u` is built using an anisotropic diffusivity tensor
 function compute_gradient_flux!(
     m::SingleStack,
     diffusive::Vars,
@@ -254,11 +259,32 @@ function compute_gradient_flux!(
     t::Real,
 )
     diffusive.α∇ρcT = m.α * ∇transform.ρcT
-    diffusive.μ∇u = m.μ * ∇transform.u
+    diffusive.μ∇u = Diagonal(@SVector [m.μh, m.μh, m.μv]) * ∇transform.u
 end;
 
-# We have no sources, nor non-diffusive fluxes.
-function source!(m::SingleStack, _...) end;
+# Introduce Rayleigh friction towards a target profile as a source.
+# Note that:
+# - Rayleigh damping is only applied in the horizontal by subtracting
+#  the vertical component.
+function source!(
+    m::SingleStack,
+    source::Vars, 
+    state::Vars,
+    diffusive::Vars, 
+    aux::Vars,
+    args...
+) 
+    ẑ = [0.0, 0.0, 1.0];
+    ρ̄ū = state.ρ*[1 - 4*(aux.z - m.zmax/2)^2, 1 - 4*(aux.z - m.zmax/2)^2, 0.0]./2;
+    ρu_p = state.ρu - ρ̄ū;
+    source.ρu -= m.γ * (ρu_p - ẑ'*ρu_p * ẑ);
+
+end;
+
+# Compute advective flux.
+# Note that:
+# - `state.ρu` is available here because we've specified `α∇ρcT` in
+# `vars_state_conservative`
 function flux_first_order!(
     m::SingleStack,
     flux::Grad,
@@ -273,7 +299,7 @@ function flux_first_order!(
     flux.ρcT = u * state.ρcT
 end;
 
-# Compute diffusive flux (``F(α, ρcT, t) = -α ∇ρcT`` in the original PDE).
+# Compute diffusive flux (e.g. ``F(α, ρcT, t) = -α ∇ρcT`` in the original PDE).
 # Note that:
 # - `diffusive.α∇ρcT` is available here because we've specified `α∇ρcT` in
 # `vars_state_gradient_flux`
@@ -376,12 +402,13 @@ t0 = FT(0)
 timeend = FT(10)
 
 # We'll define the time-step based on the [Fourier
-# number](https://en.wikipedia.org/wiki/Fourier_number)
+# number] and the [Courant number] of the flow
 Δ = min_node_distance(driver_config.grid)
 
 given_Fourier = FT(0.08);
-Fourier_bound = given_Fourier * Δ^2 / m.α;
-dt = Fourier_bound
+Fourier_bound = given_Fourier * Δ^2 / max(m.α, m.μh);
+Courant_bound = FT(0.1) * Δ
+dt = min(Fourier_bound, Courant_bound)
 
 # # Configure a `ClimateMachine` solver.
 
@@ -395,7 +422,7 @@ dt = Fourier_bound
 solver_config =
     ClimateMachine.SolverConfiguration(t0, timeend, driver_config, ode_dt = dt);
 
-# ## Inspect the initial conditions
+# ## Inspect the initial conditions for the first node
 
 # Let's export a plot of the initial state
 output_dir = @__DIR__;
@@ -406,32 +433,81 @@ z_scale = 100 # convert from meters to cm
 z_key = "z"
 z_label = "z [cm]"
 z = get_z(driver_config.grid, z_scale)
-state_vars = get_vars_from_stack(
+state_vars = get_vars_from_nodal_stack(
     driver_config.grid,
     solver_config.Q,
-    m,
-    vars_state_conservative,
+    vars_state_conservative(m, FT),
+    i = 1, 
+    j = 1
 );
-aux_vars = get_vars_from_stack(
+aux_vars = get_vars_from_nodal_stack(
     driver_config.grid,
     solver_config.dg.state_auxiliary,
-    m,
-    vars_state_auxiliary;
+    vars_state_auxiliary(m, FT),
+    i = 1, 
+    j = 1,
     exclude = [z_key]
 );
 all_vars = OrderedDict(state_vars..., aux_vars...);
-# all_vars = prep_for_io(z_label, all_vars)
+
+# Generate plots of initial conditions
 export_plot_snapshot(
     z,
     all_vars,
     ("ρcT",),
-    joinpath(output_dir, "initial_condition.png"),
+    joinpath(output_dir, "initial_condition_T.png"),
     z_label,
 );
-# ![](initial_condition.png)
+export_plot_snapshot(
+    z,
+    all_vars,
+    ("ρu[1]",),
+    joinpath(output_dir, "initial_condition_u.png"),
+    z_label,
+);
+export_plot_snapshot(
+    z,
+    all_vars,
+    ("ρu[2]",),
+    joinpath(output_dir, "initial_condition_v.png"),
+    z_label,
+);
+export_plot_snapshot(
+    z,
+    all_vars,
+    ("ρu[3]",),
+    joinpath(output_dir, "initial_condition_w.png"),
+    z_label,
+);
 
-# It matches what we have in `init_state_conservative!(m::SingleStack, ...)`, so
-# let's continue.
+# Horizontal statistics of variables
+state_vars_var = get_horizontal_variance(
+            driver_config.grid,
+            solver_config.Q,
+            vars_state_conservative(m, FT));
+
+state_vars_avg = get_horizontal_mean(
+            driver_config.grid,
+            solver_config.Q,
+            vars_state_conservative(m, FT));
+
+export_plot_snapshot(
+    z,
+    state_vars_avg,
+    ("ρu[1]",),
+    joinpath(output_dir, "initial_condition_avg.png"),
+    z_label,
+);
+export_plot_snapshot(
+    z,
+    state_vars_var,
+    ("ρu[1]",),
+    joinpath(output_dir, "initial_condition_variance.png"),
+    z_label,
+);
+
+# ![](initial_condition_avg.png)
+# ![](initial_condition_variance.png)
 
 # # Solver hooks / callbacks
 
@@ -447,9 +523,11 @@ dims = OrderedDict(z_key => collect(z));
 # Create a DataFile, which is callable to get the name of each file given a step
 output_data = DataFile(joinpath(output_dir, "output_data"));
 
-all_data = Dict([k => Dict() for k in 0:n_outputs]...)
-all_data[0] = deepcopy(all_vars)
+data_var = Dict([k => Dict() for k in 0:n_outputs]...)
+data_var[0] = deepcopy(state_vars_var)
 
+data_avg = Dict([k => Dict() for k in 0:n_outputs]...)
+data_avg[0] = deepcopy(state_vars_avg)
 # The `ClimateMachine`'s time-steppers provide hooks, or callbacks, which
 # allow users to inject code to be executed at specified intervals. In this
 # callback, the state and aux variables are collected, combined into a single
@@ -459,22 +537,19 @@ callback = GenericCallbacks.EveryXSimulationTime(
     every_x_simulation_time,
     solver_config.solver,
 ) do (init = false)
-    state_vars = get_vars_from_stack(
+    state_vars_var = get_horizontal_variance(
         driver_config.grid,
         solver_config.Q,
-        m,
-        vars_state_conservative,
+        vars_state_conservative(m, FT),
     )
-    aux_vars = get_vars_from_stack(
+    state_vars_avg = get_horizontal_mean(
         driver_config.grid,
-        solver_config.dg.state_auxiliary,
-        m,
-        vars_state_auxiliary;
-        exclude = [z_key],
+        solver_config.Q,
+        vars_state_conservative(m, FT),
     )
-    all_vars = OrderedDict(state_vars..., aux_vars...)
     step[1] += 1
-    all_data[step[1]] = deepcopy(all_vars)
+    data_var[step[1]] = deepcopy(state_vars_var)
+    data_avg[step[1]] = deepcopy(state_vars_avg)
     nothing
 end;
 
@@ -488,31 +563,50 @@ ClimateMachine.invoke!(solver_config; user_callbacks = (callback,))
 # # Post-processing
 
 # Our solution has now been calculated and exported to NetCDF files in
-# `output_dir`. Let's collect them all into a nested dictionary whose keys are
-# the output interval. The next level keys are the variable names, and the
-# values are the values along the grid:
+# `output_dir`.
 
-# all_data = collect_data(output_data, step[1]);
-
-# To get `T` at ``t=0``, we can use `T_at_t_0 = all_data[0]["T"][:]`
-# @show keys(all_data[0])
-
-# Let's plot the solution:
-
+# Let's plot the horizontal statistics of the solution:
 export_plot(
     z,
-    all_data,
-    ("ρu[1]","ρu[2]",),
-    joinpath(output_dir, "solution_vs_time.png"),
+    data_avg,
+    ("ρu[1]"),
+    joinpath(output_dir, "solution_vs_time_u.png"),
     z_label,
+    "Horizontal mean rho*u"
 );
-# ![](solution_vs_time.png)
+export_plot(
+    z,
+    data_var,
+    ("ρu[1]"),
+    joinpath(output_dir, "variance_vs_time_u.png"),
+    z_label,
+    "Horizontal variance rho*u"
+);
+export_plot(
+    z,
+    data_avg,
+    ("ρcT"),
+    joinpath(output_dir, "solution_vs_time_T.png"),
+    z_label,
+    "Horizontal mean rho*c*T"
+);
+export_plot(
+    z,
+    data_var,
+    ("ρu[3]"),
+    joinpath(output_dir, "variance_vs_time_w.png"),
+    z_label,
+    "Horizontal variance rho*w"
+);
+# ![](solution_vs_time_u.png)
+# ![](variance_vs_time_u.png)
 
-# The results look as we would expect: a fixed temperature at the bottom is
-# resulting in heat flux that propagates up the domain. To run this file, and
-# inspect the solution in `all_data`, include this tutorial in the Julia REPL
+# The results look as we would expect: they Rayleigh friction damps the 
+# horizontal velocity to the objective profile and the horizontal
+# diffusivity damps the horizontal variance. To run this file, and
+# inspect the solution, include this tutorial in the Julia REPL
 # with:
 
 # ```julia
-# include(joinpath("tutorials", "Land", "Heat", "heat_equation.jl"))
+# include(joinpath("test", "Driver", "single_stack_test.jl"))
 # ```

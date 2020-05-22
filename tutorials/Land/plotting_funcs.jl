@@ -20,11 +20,11 @@ function plot_friendly_name(ϕ)
 end
 
 """
-    export_plot(z, all_data, ϕ_all, filename, ylabel)
+    export_plot(z, all_data, ϕ_all, filename, ylabel, var_legend)
 Export plot of all variables, or all
 available time-steps in `all_data`.
 """
-function export_plot(z, all_data, ϕ_all, filename, ylabel)
+function export_plot(z, all_data, ϕ_all, filename, ylabel, var_legend)
     ϕ_all isa Tuple || (ϕ_all = (ϕ_all,))
     p = plot()
     for n in 0:(length(keys(all_data)) - 1)
@@ -35,10 +35,10 @@ function export_plot(z, all_data, ϕ_all, filename, ylabel)
             if eltype(ϕ_data) <: AbstractArray
                 for k in size(first(ϕ_data))
                     vec_data = getindex.(ϕ_data,k)
-                    plot!(vec_data, z, xlabel = ϕ_name*"_$(k)", ylabel = ylabel)
+                    plot!(vec_data, z, xlabel = var_legend, ylabel = ylabel)
                 end
             else
-                plot!(ϕ_data, z, xlabel = ϕ_name, ylabel = ylabel)
+                plot!(ϕ_data, z, xlabel = var_legend, ylabel = ylabel)
             end
         end
     end
