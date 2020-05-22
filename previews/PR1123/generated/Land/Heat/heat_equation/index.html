@@ -226,15 +226,15 @@ end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1"
 │     dt              = 1.10397e-03
 │     timeend         =    40.00
 │     number of steps = 36233
-└     norm(Q)         = 2.9515000000000060e+02
+└     norm(Q)         = 2.9515000000000049e+02
 ┌ Info: Update
-│     simtime =    24.40 /    40.00
+│     simtime =    34.78 /    40.00
 │     runtime = 00:01:00
-└     norm(Q) = 2.9784651128436985e+02
+└     norm(Q) = 2.9833447237214716e+02
 ┌ Info: Finished
-│     norm(Q)            = 2.9853560712934308e+02
-│     norm(Q) / norm(Q₀) = 1.0114708017257072e+00
-└     norm(Q) - norm(Q₀) = 3.3856071293424748e+00</code></pre><h1 id="Post-processing-1"><a class="docs-heading-anchor" href="#Post-processing-1">Post-processing</a><a class="docs-heading-anchor-permalink" href="#Post-processing-1" title="Permalink"></a></h1><p>Our solution is stored in the nested dictionary <code>all_data</code> whose keys are the output interval. The next level keys are the variable names, and the values are the values along the grid:</p><p>To get <code>T</code> at <span>$t=0$</span>, we can use <code>T_at_t_0 = all_data[0][&quot;T&quot;][:]</code></p><pre><code class="language-julia">@show keys(all_data[0])</code></pre><pre><code class="language-none">Base.KeySet for a Dict{Any,Any} with 3 entries. Keys:
+│     norm(Q)            = 2.9853560712934313e+02
+│     norm(Q) / norm(Q₀) = 1.0114708017257077e+00
+└     norm(Q) - norm(Q₀) = 3.3856071293426453e+00</code></pre><h1 id="Post-processing-1"><a class="docs-heading-anchor" href="#Post-processing-1">Post-processing</a><a class="docs-heading-anchor-permalink" href="#Post-processing-1" title="Permalink"></a></h1><p>Our solution is stored in the nested dictionary <code>all_data</code> whose keys are the output interval. The next level keys are the variable names, and the values are the values along the grid:</p><p>To get <code>T</code> at <span>$t=0$</span>, we can use <code>T_at_t_0 = all_data[0][&quot;T&quot;][:]</code></p><pre><code class="language-julia">@show keys(all_data[0])</code></pre><pre><code class="language-none">Base.KeySet for a Dict{Any,Any} with 3 entries. Keys:
   &quot;T&quot;
   &quot;z&quot;
   &quot;ρcT&quot;</code></pre><p>Let&#39;s plot the solution:</p><pre><code class="language-julia">export_plot(
