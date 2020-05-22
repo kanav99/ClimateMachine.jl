@@ -1,6 +1,7 @@
 module SingleStackUtils
 
 export get_vars_from_nodal_stack, get_vars_from_element_stack
+export get_horizontal_variance, get_horizontal_mean
 
 using OrderedCollections
 using StaticArrays
@@ -78,7 +79,7 @@ end
         Q::MPIStateArray,
         vars;
         vrange::UnitRange = 1:size(Q, 3),
-        exclude::Vector{String} = [],
+        exclude::Vector{String} = String[],
     ) where {T, dim, N}
         exclude = [],
     )
@@ -93,7 +94,7 @@ function get_vars_from_element_stack(
     Q::MPIStateArray,
     vars;
     vrange::UnitRange = 1:size(Q, 3),
-    exclude::Vector{String} = [],
+    exclude::Vector{String} = String[],
 ) where {T, dim, N}
     Nq = N + 1
     return [
@@ -107,6 +108,105 @@ function get_vars_from_element_stack(
             exclude = exclude,
         ) for i in 1:Nq, j in 1:Nq
     ]
+end
+
+"""
+    get_horizontal_mean(
+        grid::DiscontinuousSpectralElementGrid{T, dim, N},
+        Q::MPIStateArray,
+        vars;
+        vrange::UnitRange = 1:size(Q, 3),
+        exclude::Vector{String} = String[],
+    ) where {T, dim, N}
+        exclude = [],
+    )
+
+Return a dictionary whose keys are the `flattenednames()` of the variables
+specified in `vars` (as returned by e.g. `vars_state_conservative()`), and
+whose values are arrays of the horizontal averages for that variable along 
+the vertical dimension in `Q`. Only a single element is expected in the 
+horizontal as this is intended for the single stack configuration.
+
+Variables listed in `exclude` are skipped.
+"""
+function get_horizontal_mean(
+    grid::DiscontinuousSpectralElementGrid{T, dim, N},
+    Q::MPIStateArray,
+    vars;
+    vrange::UnitRange = 1:size(Q, 3),
+    exclude::Vector{String} = String[],
+) where {T, dim, N}
+    Nq = N + 1
+    vars_avg = Dict();
+    vars_sq = Dict();
+    for i in 1:Nq
+        for j in 1:Nq
+            vars_nodal = get_vars_from_nodal_stack(
+                grid,
+                Q,
+                vars,
+                vrange = vrange,
+                i = i,
+                j = j,
+                exclude = exclude,
+            );
+            vars_avg = merge(+, vars_avg, vars_nodal);
+        end
+    end
+    map!(x->x./Nq/Nq, values(vars_avg));
+    return vars_avg
+end
+
+"""
+    get_horizontal_variance(
+        grid::DiscontinuousSpectralElementGrid{T, dim, N},
+        Q::MPIStateArray,
+        vars;
+        vrange::UnitRange = 1:size(Q, 3),
+        exclude::Vector{String} = String[],
+    ) where {T, dim, N}
+        exclude = [],
+    )
+
+Return a dictionary whose keys are the `flattenednames()` of the variables
+specified in `vars` (as returned by e.g. `vars_state_conservative()`), and
+whose values are arrays of the horizontal variance for that variable along 
+the vertical dimension in `Q`. Only a single element is expected in the 
+horizontal as this is intended for the single stack configuration.
+
+Variables listed in `exclude` are skipped.
+"""
+function get_horizontal_variance(
+    grid::DiscontinuousSpectralElementGrid{T, dim, N},
+    Q::MPIStateArray,
+    vars;
+    vrange::UnitRange = 1:size(Q, 3),
+    exclude::Vector{String} = String[],
+) where {T, dim, N}
+    Nq = N + 1
+    vars_avg = Dict();
+    vars_sq = Dict();
+    for i in 1:Nq
+        for j in 1:Nq
+            vars_nodal = get_vars_from_nodal_stack(
+                grid,
+                Q,
+                vars,
+                vrange = vrange,
+                i = i,
+                j = j,
+                exclude = exclude,
+            );
+            vars_nodal_sq = Dict(vars_nodal);
+            map!(x->x.^2, values(vars_nodal_sq));
+            vars_avg = merge(+, vars_avg, vars_nodal);
+            vars_sq = merge(+, vars_sq, vars_nodal_sq);
+        end
+    end
+    map!(x->(x./Nq/Nq).^2, values(vars_avg));
+    map!(x->x./Nq/Nq, values(vars_sq));
+    vars_var = merge(-, vars_sq, vars_avg);
+    return vars_var
 end
 
 end # module
