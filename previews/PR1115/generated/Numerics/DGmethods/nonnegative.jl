@@ -140,7 +140,7 @@ function run(
         Filters.apply!(Q, 1, grid, TMARFilter())
     end
 
-    if MPI.rank(mpicomm) == 0
+    if MPI.Comm_rank(mpicomm) == 0
         mkpath(vtkdir)
     end
     MPI.Barrier(mpicom)
@@ -213,10 +213,8 @@ let
     CFL = 1
     dt = CFL * dx / maxvelocity
 
-    vtkdir = abspath(joinpath(
-        ClimateMachine.Settings.output_dir,
-        "vtk_nonnegative",
-    ))
+    vtkdir =
+        abspath(joinpath(ClimateMachine.Settings.output_dir, "vtk_nonnegative"))
     outputtime = 0.0625
     dt = outputtime / ceil(Int64, outputtime / dt)
 
