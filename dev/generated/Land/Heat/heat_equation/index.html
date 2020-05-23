@@ -87,7 +87,7 @@ end;</code></pre><p>Specify where in <code>diffusive::Vars</code> to store the c
     aux::Vars,
     t::Real,
 )
-    diffusive.α∇ρcT = m.α * ∇transform.ρcT
+    diffusive.α∇ρcT = -m.α * ∇transform.ρcT
 end;</code></pre><p>We have no sources, nor non-diffusive fluxes.</p><pre><code class="language-julia">function source!(m::HeatModel, _...) end;
 function flux_first_order!(
     m::HeatModel,
@@ -104,8 +104,8 @@ function flux_first_order!(
     aux::Vars,
     t::Real,
 )
-    flux.ρcT -= diffusive.α∇ρcT
-end;</code></pre><h3 id="Boundary-conditions-1"><a class="docs-heading-anchor" href="#Boundary-conditions-1">Boundary conditions</a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions-1" title="Permalink"></a></h3><p>Second-order terms in our equations, <span>$∇⋅(G)$</span> where <span>$G = α∇ρcT$</span>, are internally reformulated to first-order unknowns. Boundary conditions must be specified for all unknowns, both first-order and second-order unknowns which have been reformulated.</p><p>The boundary conditions for <code>ρcT</code> (first order unknown)</p><pre><code class="language-julia">function boundary_state!(
+    flux.ρcT += diffusive.α∇ρcT
+end;</code></pre><h3 id="Boundary-conditions-1"><a class="docs-heading-anchor" href="#Boundary-conditions-1">Boundary conditions</a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions-1" title="Permalink"></a></h3><p>Second-order terms in our equations, <span>$∇⋅(F)$</span> where <span>$F = -α∇ρcT$</span>, are internally reformulated to first-order unknowns. Boundary conditions must be specified for all unknowns, both first-order and second-order unknowns which have been reformulated.</p><p>The boundary conditions for <code>ρcT</code> (first order unknown)</p><pre><code class="language-julia">function boundary_state!(
     nf,
     m::HeatModel,
     state⁺::Vars,
@@ -139,7 +139,7 @@ end;</code></pre><p>The boundary conditions for <code>ρcT</code> are specified 
     if bctype == 1 # bottom
         state⁺.ρcT = m.ρc * m.T_bottom
     elseif bctype == 2 # top
-        diff⁺.α∇ρcT = -n⁻ * m.flux_top
+        diff⁺.α∇ρcT = n⁻ * m.flux_top
     end
 end;</code></pre><h1 id="Spatial-discretization-1"><a class="docs-heading-anchor" href="#Spatial-discretization-1">Spatial discretization</a><a class="docs-heading-anchor-permalink" href="#Spatial-discretization-1" title="Permalink"></a></h1><p>Prescribe polynomial order of basis functions in finite elements</p><pre><code class="language-julia">N_poly = 5;</code></pre><p>Specify the number of vertical elements</p><pre><code class="language-julia">nelem_vert = 10;</code></pre><p>Specify the domain height</p><pre><code class="language-julia">zmax = FT(1);</code></pre><p>Establish a <code>ClimateMachine</code> single stack configuration</p><pre><code class="language-julia">driver_config = ClimateMachine.SingleStackConfiguration(
     &quot;HeatEquation&quot;,
@@ -226,15 +226,15 @@ end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1"
 │     dt              = 1.10397e-03
 │     timeend         =    40.00
 │     number of steps = 36233
-└     norm(Q)         = 2.9515000000000060e+02
+└     norm(Q)         = 2.9515000000000049e+02
 ┌ Info: Update
-│     simtime =    25.87 /    40.00
+│     simtime =    33.74 /    40.00
 │     runtime = 00:01:00
-└     norm(Q) = 2.9792371389484367e+02
+└     norm(Q) = 2.9829093383132488e+02
 ┌ Info: Finished
-│     norm(Q)            = 2.9853560712934308e+02
-│     norm(Q) / norm(Q₀) = 1.0114708017257072e+00
-└     norm(Q) - norm(Q₀) = 3.3856071293424748e+00</code></pre><h1 id="Post-processing-1"><a class="docs-heading-anchor" href="#Post-processing-1">Post-processing</a><a class="docs-heading-anchor-permalink" href="#Post-processing-1" title="Permalink"></a></h1><p>Our solution is stored in the nested dictionary <code>all_data</code> whose keys are the output interval. The next level keys are the variable names, and the values are the values along the grid:</p><p>To get <code>T</code> at <span>$t=0$</span>, we can use <code>T_at_t_0 = all_data[0][&quot;T&quot;][:]</code></p><pre><code class="language-julia">@show keys(all_data[0])</code></pre><pre><code class="language-none">Base.KeySet for a Dict{Any,Any} with 3 entries. Keys:
+│     norm(Q)            = 2.9853560712934313e+02
+│     norm(Q) / norm(Q₀) = 1.0114708017257077e+00
+└     norm(Q) - norm(Q₀) = 3.3856071293426453e+00</code></pre><h1 id="Post-processing-1"><a class="docs-heading-anchor" href="#Post-processing-1">Post-processing</a><a class="docs-heading-anchor-permalink" href="#Post-processing-1" title="Permalink"></a></h1><p>Our solution is stored in the nested dictionary <code>all_data</code> whose keys are the output interval. The next level keys are the variable names, and the values are the values along the grid:</p><p>To get <code>T</code> at <span>$t=0$</span>, we can use <code>T_at_t_0 = all_data[0][&quot;T&quot;][:]</code></p><pre><code class="language-julia">@show keys(all_data[0])</code></pre><pre><code class="language-none">Base.KeySet for a Dict{Any,Any} with 3 entries. Keys:
   &quot;T&quot;
   &quot;z&quot;
   &quot;ρcT&quot;</code></pre><p>Let&#39;s plot the solution:</p><pre><code class="language-julia">export_plot(
@@ -243,4 +243,4 @@ end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1"
     (&quot;ρcT&quot;,),
     joinpath(output_dir, &quot;solution_vs_time.png&quot;),
     z_label,
-);</code></pre><p><img src="../solution_vs_time.png" alt/></p><p>The results look as we would expect: a fixed temperature at the bottom is resulting in heat flux that propagates up the domain. To run this file, and inspect the solution in <code>all_data</code>, include this tutorial in the Julia REPL with:</p><pre><code class="language-julia">include(joinpath(&quot;tutorials&quot;, &quot;Land&quot;, &quot;Heat&quot;, &quot;heat_equation.jl&quot;))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../Atmos/risingbubble/">« Rising Thermal Bubble</a><a class="docs-footer-nextpage" href="../../../Numerics/LinearSolvers/cg/">Conjugate Gradient »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 22 May 2020 06:24">Friday 22 May 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+);</code></pre><p><img src="../solution_vs_time.png" alt/></p><p>The results look as we would expect: a fixed temperature at the bottom is resulting in heat flux that propagates up the domain. To run this file, and inspect the solution in <code>all_data</code>, include this tutorial in the Julia REPL with:</p><pre><code class="language-julia">include(joinpath(&quot;tutorials&quot;, &quot;Land&quot;, &quot;Heat&quot;, &quot;heat_equation.jl&quot;))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../Atmos/risingbubble/">« Rising Thermal Bubble</a><a class="docs-footer-nextpage" href="../../../Numerics/LinearSolvers/cg/">Conjugate Gradient »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Saturday 23 May 2020 00:08">Saturday 23 May 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
