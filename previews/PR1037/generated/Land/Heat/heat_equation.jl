@@ -122,7 +122,7 @@ function compute_gradient_flux!(
     aux::Vars,
     t::Real,
 )
-    diffusive.α∇ρcT = m.α * ∇transform.ρcT
+    diffusive.α∇ρcT = -m.α * ∇transform.ρcT
 end;
 
 function source!(m::HeatModel, _...) end;
@@ -137,7 +137,7 @@ function flux_second_order!(
     aux::Vars,
     t::Real,
 )
-    flux.ρcT -= diffusive.α∇ρcT
+    flux.ρcT += diffusive.α∇ρcT
 end;
 
 function boundary_state!(
@@ -176,7 +176,7 @@ function boundary_state!(
     if bctype == 1 # bottom
         state⁺.ρcT = m.ρc * m.T_bottom
     elseif bctype == 2 # top
-        diff⁺.α∇ρcT = -n⁻ * m.flux_top
+        diff⁺.α∇ρcT = n⁻ * m.flux_top
     end
 end;
 
