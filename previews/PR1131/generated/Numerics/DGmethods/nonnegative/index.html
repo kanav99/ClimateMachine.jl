@@ -137,9 +137,11 @@ function run(
 
     cbTMAR = EveryXSimulationSteps(1) do
         Filters.apply!(Q, 1, grid, TMARFilter())
+    end</code></pre><p>create output directory on first rank of communicator</p><pre><code class="language-">    if MPI.Comm_rank(mpicomm) == 0
+        mkpath(vtkdir)
     end
+    MPI.Barrier(mpicomm)
 
-    mkpath(vtkdir)
     vtkstep = 0</code></pre><p>output initial step</p><pre><code class="language-">    do_output(mpicomm, vtkdir, vtkstep, dg, Q, model, &quot;nonnegative&quot;)</code></pre><p>setup the output callback</p><pre><code class="language-">    cbvtk = EveryXSimulationSteps(floor(outputtime / dt)) do
         vtkstep += 1
         minQ, maxQ = minimum(Q), maximum(Q)
@@ -204,7 +206,8 @@ let
     CFL = 1
     dt = CFL * dx / maxvelocity
 
-    vtkdir = &quot;vtk_nonnegative&quot;
+    vtkdir =
+        abspath(joinpath(ClimateMachine.Settings.output_dir, &quot;vtk_nonnegative&quot;))
     outputtime = 0.0625
     dt = outputtime / ceil(Int64, outputtime / dt)
 
@@ -231,4 +234,4 @@ let
         vtkdir,
         outputtime,
     )
-end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 22 May 2020 15:04">Friday 22 May 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 26 May 2020 18:16">Tuesday 26 May 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
