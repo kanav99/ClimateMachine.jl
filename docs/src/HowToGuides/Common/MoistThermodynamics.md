@@ -139,33 +139,6 @@ thermodynamic state into one of:
    non-equilibrium, uniquely determined by four independent thermodynamic
    properties
 
-For example, to add a thermodynamic state constructor that accepts temperature,
-density and total specific humidity, we could add the following code to
-`states.jl`:
-
-```
-"""
-    TemperatureSHumEquil_given_density(param_set, T, ρ, q_tot)
-
-Constructs a [`PhaseEquil`](@ref) thermodynamic state from temperature.
-
- - `param_set` parameter set, used to dispatch planet parameter function calls
- - `T` temperature
- - `ρ` density
- - `q_tot` total specific humidity
-"""
-function TemperatureSHumEquil(
-    param_set::APS,
-    T::FT,
-    ρ::FT,
-    q_tot::FT,
-) where {FT <: Real}
-    q = PhasePartition_equil(param_set, T, ρ, q_tot)
-    e_int = internal_energy(param_set, T, q)
-    return PhaseEquil{FT, typeof(param_set)}(param_set, e_int, ρ, q_tot, T)
-end
-```
-
 ## Tested Profiles
 
 MoistThermodynamics.jl is tested using a set of profiles, or thermodynamic states, specified in [`tested_profiles`](@ref MoistThermodynamics.tested_profiles).
@@ -182,7 +155,6 @@ struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
 FT = Float64;
 include(joinpath(repeat([".."], 4),"test", "Common", "MoistThermodynamics", "profiles.jl"))
-/Users/charliekawczynski/Dropbox/Caltech/work/dev/CliMA/CLIMA/docs/src/HowToGuides/Common/MoistThermodynamics.md
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = tested_profiles(param_set, 50, FT);
 mask_dry = q_tot .≈ 0;
 ρ_dry = ρ[mask_dry];
