@@ -1,62 +1,72 @@
 using ClimateMachine
-using ClimateMachine.LinearSolvers
-using LinearAlgebra, Random, Plots
+using ClimateMachine.SystemSolvers
+using LinearAlgebra, Random
 
-A1 = [
+A = [
     2.0 -1.0 0.0
     -1.0 2.0 -1.0
     0.0 -1.0 2.0
 ];
 
-b1 = ones(typeof(1.0), 3);
+eigvals(A)
 
-x1_exact = [1.5, 2.0, 1.5];
+function closure_linear_operator!(A)
+    function linear_operator!(x, y)
+        mul!(x, A, y)
+    end
+    return linear_operator!
+end;
 
-A2 = [
+linear_operator! = closure_linear_operator!(A)
+
+b = ones(typeof(1.0), 3);
+
+x_exact = [1.5, 2.0, 1.5];
+
+linearsolver = ConjugateGradient(b);
+
+x = ones(typeof(1.0), 3);
+
+iters = linearsolve!(linear_operator!, linearsolver, x, b)
+
+norm(x - x_exact) / norm(x_exact)
+
+norm(A * x - b) / norm(b)
+
+iters
+
+A = [
     2.0 -1.0 0.0
     0.0 2.0 -1.0
     0.0 0.0 2.0
 ];
 
-b2 = ones(typeof(1.0), 3);
+eigvals(A)
 
-x2_exact = [0.875, 0.75, 0.5];
-
-function closure_linear_operator(A1, A2)
+function closure_linear_operator!(A)
     function linear_operator!(x, y)
-        mul!(view(x, :, 1), A1, view(y, :, 1))
-        mul!(view(x, :, 2), A2, view(y, :, 2))
-        return nothing
+        mul!(x, A, y)
     end
     return linear_operator!
 end;
 
-linear_operator! = closure_linear_operator(A1, A2);
+linear_operator! = closure_linear_operator!(A)
 
-y1 = ones(typeof(1.0), 3);
-y2 = ones(typeof(1.0), 3) * 2.0;
-y = [y1 y2];
-x = copy(y);
-linear_operator!(x, y);
-x
+b = ones(typeof(1.0), 3);
 
-[A1 * y1 A2 * y2]
+x_exact = [0.875, 0.75, 0.5];
 
-b = [b1 b2];
+linearsolver = ConjugateGradient(b, max_iter = 100);
 
-x_exact = [x1_exact x2_exact];
-
-linearsolver = BatchedGeneralizedMinimalResidual(b);
-
-x1 = ones(typeof(1.0), 3);
-x2 = ones(typeof(1.0), 3);
-x = [x1 x2];
+x = ones(typeof(1.0), 3);
 
 iters = linearsolve!(linear_operator!, linearsolver, x, b)
 
-x
+norm(x - x_exact) / norm(x_exact)
 
-x_exact
+norm(A * x - b) / norm(b)
+
+iters
 
 function closure_linear_operator!(A, tup)
     function linear_operator!(y, x)
@@ -77,18 +87,17 @@ function closure_linear_operator!(A, tup)
     end
 end;
 
-tup = (2, 2, 5, 2, 10, 2);
+tup = (3, 4, 7, 2, 20, 2);
 
-Random.seed!(1234);
+Random.seed!(1235);
 B = [
     randn(tup[3] * tup[5], tup[3] * tup[5])
     for i1 in 1:tup[1], i2 in 1:tup[2], i4 in 1:tup[4], i6 in 1:tup[6]
 ];
 columnwise_A = [
-    B[i1, i2, i4, i6] + 3 * (i1 + i2 + i4 + i6) * I
+    B[i1, i2, i4, i6] * B[i1, i2, i4, i6]' + 10I
     for i1 in 1:tup[1], i2 in 1:tup[2], i4 in 1:tup[4], i6 in 1:tup[6]
 ];
-
 columnwise_inv_A = [
     inv(columnwise_A[i1, i2, i4, i6])
     for i1 in 1:tup[1], i2 in 1:tup[2], i4 in 1:tup[4], i6 in 1:tup[6]
@@ -98,47 +107,23 @@ columnwise_inverse_linear_operator! =
     closure_linear_operator!(columnwise_inv_A, tup);
 
 mpi_tup = (tup[1] * tup[2] * tup[3], tup[4], tup[5] * tup[6]);
-
 b = randn(mpi_tup);
+x = randn(mpi_tup);
 
-x = copy(b);
-x += randn(mpi_tup) * 0.1;
-
-reshape_tuple_f = tup;
-
-permute_tuple_f = (5, 3, 4, 6, 1, 2);
-
-ArrayType = Array;
-
-gmres = BatchedGeneralizedMinimalResidual(
-    b,
-    ArrayType = ArrayType,
-    m = tup[3] * tup[5] * tup[4],
-    n = tup[1] * tup[2] * tup[6],
-    reshape_tuple_f = reshape_tuple_f,
-    permute_tuple_f = permute_tuple_f,
-    atol = eps(Float64) * 10^2,
-    rtol = eps(Float64) * 10^2,
+linearsolver = ConjugateGradient(
+    x,
+    max_iter = tup[3] * tup[5],
+    dims = (3, 5),
+    reshape_tuple = tup,
 );
 
-iters = linearsolve!(
-    columnwise_linear_operator!,
-    gmres,
-    x,
-    b,
-    max_iters = tup[3] * tup[5] * tup[4],
-)
-
+iters = linearsolve!(columnwise_linear_operator!, linearsolver, x, b);
 x_exact = copy(x);
 columnwise_inverse_linear_operator!(x_exact, b);
 
 norm(x - x_exact) / norm(x_exact)
-columnwise_linear_operator!(x_exact, x);
-norm(x_exact - b) / norm(b)
 
-plot(log.(gmres.residual[1:iters, :]) / log(10));
-plot!(legend = false, xlims = (1, iters), ylims = (-15, 2));
-plot!(ylabel = "log10 residual", xlabel = "iterations")
+iters
 
 # This file was generated using Literate.jl, https://github.com/fredrikekre/Literate.jl
 
