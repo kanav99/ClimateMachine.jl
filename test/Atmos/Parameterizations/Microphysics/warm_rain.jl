@@ -309,7 +309,7 @@ function main()
 
     # time stepping
     t_ini = FT(0)
-    t_end = FT(30 * 60)
+    t_end = FT(5 * 60)
     dt = FT(5)
     #CFL = FT(1.75)
     filter_freq = 1
