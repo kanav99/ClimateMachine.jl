@@ -1,6 +1,5 @@
-using ClimateMachine,
-    ClimateMachine.LinearSolvers,
-    ClimateMachine.BatchedGeneralizedMinimalResidualSolver
+using ClimateMachine
+using ClimateMachine.SystemSolvers
 using LinearAlgebra, Random, Plots
 
 A1 = [
