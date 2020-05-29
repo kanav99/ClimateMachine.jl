@@ -114,7 +114,7 @@ function kinematic_model_nodal_update_auxiliary_state!(
     aux.RH = aux.q_vap / q_vap_saturation(ts_neq) * FT(100)
 
     aux.rain_w =
-        terminal_velocity(state.ρ, aux.q_rai)
+        terminal_velocity(param_set, rain_param_set, state.ρ, aux.q_rai)
 
     # more diagnostics
     #q_eq = PhasePartition_equil(param_set, aux.T, state.ρ, aux.q_tot)
@@ -163,8 +163,8 @@ function boundary_state!(
     t,
     args...,
 )
-    #state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
-    state⁺.ρq_rai = -state⁻.ρq_rai
+    state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
+    #state⁺.ρq_rai = -state⁻.ρq_rai
 end
 
 @inline function wavespeed(
@@ -178,7 +178,7 @@ end
     u = state.ρu / state.ρ
     q_rai::FT = state.ρq_rai / state.ρ
 
-    rain_w = terminal_velocity(state.ρ, q_rai)
+    rain_w = terminal_velocity(param_set, rain_param_set, state.ρ, aux.q_rai)
     nu = nM[1] * u[1] + nM[3] * max(u[3], rain_w, u[3] - rain_w)
 
     return abs(nu)
@@ -194,7 +194,7 @@ end
     FT = eltype(state)
     q_rai::FT = state.ρq_rai / state.ρ
 
-    rain_w = terminal_velocity(state.ρ, q_rai)
+    rain_w = terminal_velocity(param_set, rain_param_set, state.ρ, aux.q_rai)
 
     # advect moisture ...
     flux.ρq_tot = SVector(
@@ -266,11 +266,14 @@ function source!(
 
     # cloud water and ice condensation/evaporation
     source.ρq_liq +=
-        state.ρ * conv_q_vap_to_q_liq_ice(q_eq, q)
+        state.ρ * conv_q_vap_to_q_liq_ice(liquid_param_set, q_eq, q)
 
     # tendencies from rain
-    src_q_rai_acnv = conv_q_liq_to_q_rai(q_liq)
+    src_q_rai_acnv = conv_q_liq_to_q_rai(rain_param_set, q_liq)
     src_q_rai_accr = accretion(
+        param_set,
+        liquid_param_set,
+        rain_param_set,
         q_liq,
         q_rai,
         state.ρ,
@@ -309,7 +312,7 @@ function main()
 
     # time stepping
     t_ini = FT(0)
-    t_end = FT(30 * 60)
+    t_end = FT(2 * 60) #FT(30 * 60)
     dt = FT(5)
     #CFL = FT(1.75)
     filter_freq = 1

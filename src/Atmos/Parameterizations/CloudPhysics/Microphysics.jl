@@ -13,55 +13,71 @@ module Microphysics
 
 using ClimateMachine.MoistThermodynamics
 
+using CLIMAParameters
+using CLIMAParameters.Planet: ρ_cloud_liq, R_v, grav, T_freeze
+using CLIMAParameters.Atmos.Microphysics
+
+const APS = AbstractParameterSet
+const ACloudPS = AbstractCloudParameterSet
+const APrecipPS = AbstractPrecipParameterSet
+const ALPS = AbstractLiquidParameterSet
+const ARPS = AbstractRainParameterSet
+
 export terminal_velocity
 export conv_q_vap_to_q_liq_ice
 export conv_q_liq_to_q_rai
 export accretion
 
 """
-    v0_rai(ρ)
+    v0_rai(param_set, ρ)
 
+ - `param_set` - abstract set with earth parameters
  - `ρ` air density
 
 Returns the proportionality coefficient in terminal velocity(r/r0).
 """
-function v0_rai(ρ::FT) where {FT <: Real}
+function v0_rai(param_set::APS, rain_param_set::ARPS, ρ::FT) where {FT <: Real}
 
-    _ρ_cloud_liq::FT = FT(916.7)
-    _C_drag::FT = FT(0.55)
-    _grav::FT = FT(9.81)
-    _r0::FT = FT(1e-3)
+    _ρ_cloud_liq::FT = ρ_cloud_liq(param_set)
+    _C_drag::FT = Microphysics.C_drag(param_set)
+    _grav::FT = grav(param_set)
+    _r0::FT = r0(rain_param_set)
 
     return sqrt(FT(8 / 3) / _C_drag * (_ρ_cloud_liq / ρ - FT(1)) * _grav * _r0)
 end
 
 """
-    unpack_params(ρ, q_)
+    unpack_params(param_set, microphysics_param_set, ρ, q_)
 
+ - `param_set` - abstract set with earth parameters
+ - `microphysics_param_set` - abstract set with microphysics parameters
  - `q_` - specific humidity
  - `ρ` - air density
 
 Utility function that unpacks microphysics parameters.
 """
 @inline function unpack_params(
+    param_set::APS,
+    rain_param_set::ARPS,
     ρ::FT,
     q_rai::FT,
 ) where {FT <: Real}
-    _n0::FT = FT(8e6*2)
-    _r0::FT = FT(1e-3)
-    _m0::FT = FT(4/3. * π * 916.7) * _r0^FT(3)
-    _me::FT = FT(3)
-    _a0::FT = FT(π) * _r0^FT(2)
-    _ae::FT = FT(2)
-    _v0::FT = v0_rai(ρ)
-    _ve::FT = FT(0.5)
+    _n0::FT = n0(rain_param_set)
+    _r0::FT = r0(rain_param_set)
 
-    _χm::FT = FT(1)
-    _Δm::FT = FT(0)
-    _χa::FT = FT(1)
-    _Δa::FT = FT(0)
-    _χv::FT = FT(1)
-    _Δv::FT = FT(0)
+    _m0::FT = m0(param_set, rain_param_set)
+    _me::FT = me(rain_param_set)
+    _a0::FT = a0(rain_param_set)
+    _ae::FT = ae(rain_param_set)
+    _v0::FT = v0_rai(param_set, rain_param_set, ρ)
+    _ve::FT = ve(rain_param_set)
+
+    _χm::FT = χm(rain_param_set)
+    _Δm::FT = Δm(rain_param_set)
+    _χa::FT = χa(rain_param_set)
+    _Δa::FT = Δa(rain_param_set)
+    _χv::FT = χv(rain_param_set)
+    _Δv::FT = Δv(rain_param_set)
 
     return (
         _n0,
@@ -116,8 +132,10 @@ function lambda(
 end
 
 """
-    terminal_velocity(ρ, q_)
+    terminal_velocity(param_set, precip_param_set, ρ, q_)
 
+ - `param_set` - abstract set with earth parameters
+ - `precip_param_set` - abstract set with rain or snow parameters
  - `ρ` - air density
  - `q_` - rain or snow specific humidity
 
@@ -125,6 +143,8 @@ Returns the mass weighted average terminal velocity assuming
 a Marshall-Palmer (1948) distribution of rain drops and snow crystals.
 """
 function terminal_velocity(
+    param_set::APS,
+    precip_param_set::APrecipPS,
     ρ::FT,
     q_::FT,
 ) where {FT <: Real}
@@ -132,7 +152,7 @@ function terminal_velocity(
     if q_ > FT(0)
 
         (_n0, _r0, _m0, _me, _χm, _Δm, _a0, _ae, _χa, _Δa, _v0, _ve, _χv, _Δv) =
-            unpack_params(ρ, q_)
+            unpack_params(param_set, precip_param_set, ρ, q_)
 
         _λ::FT = lambda(q_, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
 
@@ -150,8 +170,9 @@ function terminal_velocity(
 end
 
 """
-    conv_q_vap_to_q_liq_ice(q_sat, q)
+    conv_q_vap_to_q_liq_ice(liquid_param_set, q_sat, q)
 
+ - `liquid_param_set` - abstract set with cloud water parameters
  - `q_sat` - PhasePartition at equilibrium
  - `q` - current PhasePartition
 
@@ -161,34 +182,39 @@ The tendency is obtained assuming a relaxation to equilibrium with
 a constant timescale.
 """
 function conv_q_vap_to_q_liq_ice(
+    liquid_param_set::ALPS,
     q_sat::PhasePartition{FT},
     q::PhasePartition{FT},
 ) where {FT <: Real}
 
-    _τ_cond_evap::FT = FT(10)
+    _τ_cond_evap::FT = τ_cond_evap(liquid_param_set)
 
     return (q_sat.liq - q.liq) / _τ_cond_evap
 end
 
 """
-    conv_q_liq_to_q_rai(q_liq)
+    conv_q_liq_to_q_rai(rain_param_set, q_liq)
 
+ - `rain_param_set` - abstract set with rain microphysics parameters
  - `q_liq` - liquid water specific humidity
 
 Returns the q_rai tendency due to collisions between cloud droplets
 (autoconversion), parametrized following Kessler (1995).
 """
-function conv_q_liq_to_q_rai(q_liq::FT) where {FT <: Real}
+function conv_q_liq_to_q_rai(rain_param_set::ARPS, q_liq::FT) where {FT <: Real}
 
-    _τ_acnv::FT = FT(1e3)
-    _q_liq_threshold::FT = FT(5e-4)
+    _τ_acnv::FT = τ_acnv(rain_param_set)
+    _q_liq_threshold::FT = q_liq_threshold(rain_param_set)
 
     return max(FT(0), q_liq - _q_liq_threshold) / _τ_acnv
 end
 
 """
-    accretion(q_clo, q_pre, ρ)
+    accretion(param_set, cloud_param_set, precip_param_set, q_clo, q_pre, ρ)
 
+ - `param_set` - abstract set with earth parameters
+ - `cloud_param_set` - abstract set with cloud water or cloud ice parameters
+ - `precip_param_set` - abstract set with rain or snow parameters
  - `q_clo` - cloud water or cloud ice specific humidity
  - `q_pre` - rain water or snow specific humidity
  - `ρ` - rain water or snow specific humidity
@@ -197,6 +223,9 @@ Returns the sink of cloud water (liquid or ice) due to collisions
 with precipitating water (rain or snow).
 """
 function accretion(
+    param_set::APS,
+    cloud_param_set::ACloudPS,
+    precip_param_set::APrecipPS,
     q_clo::FT,
     q_pre::FT,
     ρ::FT,
@@ -206,10 +235,10 @@ function accretion(
     if (q_clo > FT(0) && q_pre > FT(0))
 
         (_n0, _r0, _m0, _me, _χm, _Δm, _a0, _ae, _χa, _Δa, _v0, _ve, _χv, _Δv) =
-            unpack_params(ρ, q_pre)
+            unpack_params(param_set, precip_param_set, ρ, q_pre)
 
         _λ::FT = lambda(q_pre, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
-        _E::FT = FT(0.8)
+        _E::FT = E(cloud_param_set, precip_param_set)
 
         gamma_7_2::FT = FT(3.32335097044)
 
