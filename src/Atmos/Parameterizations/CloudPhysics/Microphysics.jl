@@ -11,7 +11,7 @@
 """
 module Microphysics
 
-using SpecialFunctions
+#using SpecialFunctions
 
 using ClimateMachine.MoistThermodynamics
 
@@ -89,7 +89,7 @@ end
 
 Utility function that unpacks microphysics parameters.
 """
-function unpack_params(
+@inline function unpack_params(
     param_set::APS,
     ice_param_set::AIPS,
     ρ::FT,
@@ -107,7 +107,7 @@ function unpack_params(
 
     return (_n0, _r0, _m0, _me, _χm, _Δm)
 end
-function unpack_params(
+@inline function unpack_params(
     param_set::APS,
     rain_param_set::ARPS,
     ρ::FT,
@@ -148,7 +148,7 @@ function unpack_params(
         _Δv,
     )
 end
-function unpack_params(
+@inline function unpack_params(
     param_set::APS,
     snow_param_set::ASPS,
     ρ::FT,
@@ -215,10 +215,15 @@ function lambda(
 
     λ::FT = FT(0)
 
+    #TODO - tmp
+
+    gamma_4::FT = FT(6)
+
     if q > FT(0)
         λ =
             (
-                χm * m0 * n0 * gamma(me + Δm + FT(1)) / ρ / q / r0^(me + Δm)
+                #χm * m0 * n0 * gamma(me + Δm + FT(1)) / ρ / q / r0^(me + Δm)
+                χm * m0 * n0 * gamma_4 / ρ / q / r0^(me + Δm)
             )^FT(1 / (me + Δm + 1))
     end
     return λ
@@ -347,11 +352,15 @@ function terminal_velocity(
 
         _λ::FT = lambda(q_, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
 
+        gamma_4::FT = FT(6)
+        gamma_9_2::FT = FT(11.6317283965)
+
         fall_w =
             _χv *
             _v0 *
             (_λ * _r0)^(-_ve - _Δv) *
-            gamma(_me + _ve + _Δm + _Δv + FT(1)) / gamma(_me + _Δm + FT(1))
+            #gamma(_me + _ve + _Δm + _Δv + FT(1)) / gamma(_me + _Δm + FT(1))
+            gamma_9_2 / gamma_4
     end
 
     return fall_w
@@ -443,7 +452,7 @@ function conv_q_ice_to_q_sno(
         _λ::FT = lambda(q.ice, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
 
         acnv_rate =
-            FT(4) * π * _S * _G * _n0 / ρ *
+            FT(4) * FT(π) * _S * _G * _n0 / ρ *
             exp(-_λ * _r_ice_snow) *
             (
                 _r_ice_snow^FT(2) / (_me + _Δm) +
@@ -484,9 +493,12 @@ function accretion(
         _λ::FT = lambda(q_pre, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
         _E::FT = E(cloud_param_set, precip_param_set)
 
+        gamma_7_2::FT = FT(3.32335097044)
+
         accr_rate =
             q_clo * _E * _n0 * _a0 * _v0 * _χa * _χv / _λ *
-            gamma(_ae + _ve + _Δa + _Δv + FT(1)) /
+            gamma_7_2 /
+            #gamma(_ae + _ve + _Δa + _Δv + FT(1)) /
             (_λ * _r0)^(_ae + _ve + _Δa + _Δv)
     end
     return accr_rate
@@ -561,6 +573,8 @@ function accretion_rain_sink(
             _Δm_ice,
         )
 
+        gamma_13_2::FT = FT(287.88527781)
+
         accr_rate =
             _E / ρ *
             _n0_rai *
@@ -570,15 +584,17 @@ function accretion_rain_sink(
             _v0_rai *
             _χm_rai *
             _χa_rai *
-            _χv_rai / _λ_ice / _λ_rai * gamma(
-                _me_rai +
-                _ae_rai +
-                _ve_rai +
-                _Δm_rai +
-                _Δa_rai +
-                _Δv_rai +
-                FT(1),
-            ) /
+            _χv_rai / _λ_ice / _λ_rai *
+            gamma_13_2 /
+            #gamma(
+            #    _me_rai +
+            #    _ae_rai +
+            #    _ve_rai +
+            #    _Δm_rai +
+            #    _Δa_rai +
+            #    _Δv_rai +
+            #    FT(1),
+            #) /
             (
                 _r0_rai * _λ_rai
             )^(_me_rai + _ae_rai + _ve_rai + _Δm_rai + _Δa_rai + _Δv_rai)
@@ -656,14 +672,26 @@ function accretion_snow_rain(
         _v_ti = terminal_velocity(param_set, i_param_set, ρ, q_i)
         _v_tj = terminal_velocity(param_set, j_param_set, ρ, q_j)
 
+        gamma_7::FT = FT(720)
+        gamma_8::FT = FT(5040)
+        gamma_9::FT = FT(40320)
+
         accr_rate =
-            π / ρ * _n0_i * _n0_j * _m0_j * _χm_j * _E_ij * abs(_v_ti - _v_tj) /
+            FT(π) / ρ * _n0_i * _n0_j * _m0_j * _χm_j * _E_ij * abs(_v_ti - _v_tj) /
             _r0_j^(_me_j + _Δm_j) * (
-                FT(2) * gamma(_me_j + _Δm_j + FT(1)) / _λ_i^FT(3) /
+                FT(2) *
+                gamma_7
+                #gamma(_me_j + _Δm_j + FT(1))
+                / _λ_i^FT(3) /
                 _λ_j^(_me_j + _Δm_j + FT(1)) +
-                FT(2) * gamma(_me_j + _Δm_j + FT(2)) / _λ_i^FT(2) /
+                FT(2) *
+                gamma_8
+                #gamma(_me_j + _Δm_j + FT(2))
+                / _λ_i^FT(2) /
                 _λ_j^(_me_j + _Δm_j + FT(2)) +
-                gamma(_me_j + _Δm_j + FT(3)) / _λ_i /
+                gamma_9
+                #gamma(_me_j + _Δm_j + FT(3))
+                /_λ_i /
                 _λ_j^(_me_j + _Δm_j + FT(3))
             )
     end
@@ -710,13 +738,16 @@ function evaporation_sublimation(
 
         _λ::FT = lambda(q_rai, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
 
+        gamma_11_4::FT = FT(1.6083594)
+
         evap_subl_rate =
-            FT(4) * π * _n0 / ρ * _S * _G / _λ^FT(2) * (
+            FT(4) * FT(π) * _n0 / ρ * _S * _G / _λ^FT(2) * (
                 _a_vent +
                 _b_vent * (_ν_air / _D_vapor)^FT(1 / 3) /
                 (_r0 * _λ)^((_ve + _Δv) / FT(2)) *
                 (FT(2) * _v0 * _χv / _ν_air / _λ)^FT(1 / 2) *
-                gamma((_ve + _Δv + FT(5)) / FT(2))
+                gamma_11_4
+                #gamma((_ve + _Δv + FT(5)) / FT(2))
             )
     end
     return evap_subl_rate
@@ -744,13 +775,16 @@ function evaporation_sublimation(
             unpack_params(param_set, snow_param_set, ρ, q_sno)
         _λ::FT = lambda(q_sno, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
 
+        gamma_11_4::FT = FT(1.6083594)
+
         evap_subl_rate =
-            FT(4) * π * _n0 / ρ * _S * _G / _λ^FT(2) * (
+            FT(4) * FT(π) * _n0 / ρ * _S * _G / _λ^FT(2) * (
                 _a_vent +
                 _b_vent * (_ν_air / _D_vapor)^FT(1 / 3) /
                 (_r0 * _λ)^((_ve + _Δv) / FT(2)) *
                 (FT(2) * _v0 * _χv / _ν_air / _λ)^FT(1 / 2) *
-                gamma((_ve + _Δv + FT(5)) / FT(2))
+                gamma_11_4
+                #gamma((_ve + _Δv + FT(5)) / FT(2))
             )
     end
     return evap_subl_rate
@@ -792,13 +826,16 @@ function snow_melt(
             unpack_params(param_set, snow_param_set, ρ, q_sno)
         _λ::FT = lambda(q_sno, ρ, _n0, _m0, _me, _r0, _χm, _Δm)
 
+        gamma_11_4::FT = FT(1.6083594)
+
         snow_melt_rate =
-            4 * π * _n0 / ρ * _K_therm / L * (T - _T_freeze) / _λ^FT(2) * (
+            FT(4 * π) * _n0 / ρ * _K_therm / L * (T - _T_freeze) / _λ^FT(2) * (
                 _a_vent +
                 _b_vent * (_ν_air / _D_vapor)^FT(1 / 3) /
                 (_r0 * _λ)^((_ve + _Δv) / FT(2)) *
                 (FT(2) * _v0 * _χv / _ν_air / _λ)^FT(1 / 2) *
-                gamma((_ve + _Δv + FT(5)) / FT(2))
+                gamma_11_4
+                #gamma((_ve + _Δv + FT(5)) / FT(2))
             )
     end
     return snow_melt_rate

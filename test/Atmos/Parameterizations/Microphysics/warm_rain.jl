@@ -34,14 +34,14 @@ function vars_state_auxiliary(m::KinematicModel, FT)
         RH::FT
         rain_w::FT
         # more diagnostics
-        src_cloud_liq::FT
-        src_cloud_ice::FT
-        src_acnv::FT
-        src_accr::FT
-        src_rain_evap::FT
-        flag_rain::FT
-        flag_cloud_liq::FT
-        flag_cloud_ice::FT
+        #src_cloud_liq::FT
+        #src_cloud_ice::FT
+        #src_acnv::FT
+        #src_accr::FT
+        #src_rain_evap::FT
+        #flag_rain::FT
+        #flag_cloud_liq::FT
+        #flag_cloud_ice::FT
     end
 end
 
@@ -117,38 +117,38 @@ function kinematic_model_nodal_update_auxiliary_state!(
         terminal_velocity(param_set, rain_param_set, state.ρ, aux.q_rai)
 
     # more diagnostics
-    q_eq = PhasePartition_equil(param_set, aux.T, state.ρ, aux.q_tot)
-    aux.src_cloud_liq = conv_q_vap_to_q_liq_ice(liquid_param_set, q_eq, q)
-    aux.src_cloud_ice = conv_q_vap_to_q_liq_ice(ice_param_set, q_eq, q)
-    aux.src_acnv = conv_q_liq_to_q_rai(rain_param_set, aux.q_liq)
-    aux.src_accr = accretion(
-        param_set,
-        liquid_param_set,
-        rain_param_set,
-        aux.q_liq,
-        aux.q_rai,
-        state.ρ,
-    )
-    aux.src_rain_evap = evaporation_sublimation(
-        param_set,
-        rain_param_set,
-        q,
-        aux.q_rai,
-        state.ρ,
-        aux.T,
-    )
-    aux.flag_cloud_liq = FT(0)
-    aux.flag_cloud_ice = FT(0)
-    aux.flag_rain = FT(0)
-    if (aux.q_liq >= FT(0))
-        aux.flag_cloud_liq = FT(1)
-    end
-    if (aux.q_ice >= FT(0))
-        aux.flag_cloud_ice = FT(1)
-    end
-    if (aux.q_rai >= FT(0))
-        aux.flag_rain = FT(1)
-    end
+    #q_eq = PhasePartition_equil(param_set, aux.T, state.ρ, aux.q_tot)
+    #aux.src_cloud_liq = conv_q_vap_to_q_liq_ice(liquid_param_set, q_eq, q)
+    #aux.src_cloud_ice = conv_q_vap_to_q_liq_ice(ice_param_set, q_eq, q)
+    #aux.src_acnv = conv_q_liq_to_q_rai(rain_param_set, aux.q_liq)
+    #aux.src_accr = accretion(
+    #    param_set,
+    #    liquid_param_set,
+    #    rain_param_set,
+    #    aux.q_liq,
+    #    aux.q_rai,
+    #    state.ρ,
+    #)
+    #aux.src_rain_evap = evaporation_sublimation(
+    #    param_set,
+    #    rain_param_set,
+    #    q,
+    #    aux.q_rai,
+    #    state.ρ,
+    #    aux.T,
+    #)
+    #aux.flag_cloud_liq = FT(0)
+    #aux.flag_cloud_ice = FT(0)
+    #aux.flag_rain = FT(0)
+    #if (aux.q_liq >= FT(0))
+    #    aux.flag_cloud_liq = FT(1)
+    #end
+    #if (aux.q_ice >= FT(0))
+    #    aux.flag_cloud_ice = FT(1)
+    #end
+    #if (aux.q_rai >= FT(0))
+    #    aux.flag_rain = FT(1)
+    #end
 end
 
 function boundary_state!(
