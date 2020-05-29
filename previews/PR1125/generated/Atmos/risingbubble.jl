@@ -40,17 +40,18 @@ function init_risingbubble!(bl, state, aux, (x, y, z), t)
     _grav::FT = grav(bl.param_set)
     γ::FT = c_p / c_v
 
-    xc::FT = 1250
-    yc::FT = 1250
-    zc::FT = 1000
-    r = sqrt((x - xc)^2 + (y - yc)^2 + (z - zc)^2)
-    rc::FT = 500
+    xc::FT = 5000
+    yc::FT = 1000
+    zc::FT = 2000
+    r = sqrt((x - xc)^2 + (z - zc)^2)
+    rc::FT = 2000
+    θamplitude::FT = 2
 
     θ_ref::FT = bl.ref_state.virtual_temperature_profile.T_surface
-    Δθ::FT = 0
 
+    Δθ::FT = 0
     if r <= rc
-        Δθ = FT(5) * cospi(r / rc / 2)
+        Δθ = θamplitude * (1.0 - r / rc)
     end
 
     θ = θ_ref + Δθ                                      # potential temperature
@@ -83,13 +84,11 @@ end
 
 function config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
 
-    ode_solver = ClimateMachine.MultirateSolverType(
-        splitting_type = ClimateMachine.SlowFastSplitting(),
-        fast_model = AtmosAcousticGravityLinearModel,
-        slow_method = LSRK144NiegemannDiehlBusch,
-        fast_method = LSRK144NiegemannDiehlBusch,
-        timestep_ratio = 10,
+    ode_solver = ClimateMachine.ExplicitSolverType(
+        solver_method = LSRK144NiegemannDiehlBusch,
     )
+
+    #See ODESolvers for all of the available solvers.
 
     ntracers = 4
     δ_χ = SVector{ntracers, FT}(1, 2, 3, 4)
@@ -147,15 +146,16 @@ function main()
     FT = Float64
 
     N = 4
-    Δh = FT(50)
-    Δv = FT(50)
+    Δh = FT(125)
+    Δv = FT(125)
     resolution = (Δh, Δh, Δv)
-    xmax = FT(2500)
-    ymax = FT(2500)
-    zmax = FT(2500)
+    xmax = FT(10000)
+    ymax = FT(500)
+    zmax = FT(10000)
     t0 = FT(0)
     timeend = FT(1000)
-    CFL = FT(20)
+
+    CFL = FT(1.7)
 
     driver_config = config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
     solver_config = ClimateMachine.SolverConfiguration(

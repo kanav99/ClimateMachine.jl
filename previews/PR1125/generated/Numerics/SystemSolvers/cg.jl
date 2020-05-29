@@ -1,5 +1,5 @@
-using ClimateMachine,
-    ClimateMachine.LinearSolvers, ClimateMachine.ConjugateGradientSolver
+using ClimateMachine
+using ClimateMachine.SystemSolvers
 using LinearAlgebra, Random
 
 A = [
