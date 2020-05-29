@@ -163,8 +163,8 @@ function boundary_state!(
     t,
     args...,
 )
-    state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
-    #state⁺.ρq_rai = -state⁻.ρq_rai
+    #state⁺.ρu -= 2 * dot(state⁻.ρu, n) .* SVector(n)
+    state⁺.ρq_rai = -state⁻.ρq_rai
 end
 
 @inline function wavespeed(
@@ -312,11 +312,11 @@ function main()
 
     # time stepping
     t_ini = FT(0)
-    t_end = FT(2 * 60) #FT(30 * 60)
+    t_end = FT(10 * 60) #FT(30 * 60)
     dt = FT(5)
     #CFL = FT(1.75)
     filter_freq = 1
-    output_freq = 72
+    output_freq = 10# 72
 
     driver_config = config_kinematic_eddy(
         FT,
