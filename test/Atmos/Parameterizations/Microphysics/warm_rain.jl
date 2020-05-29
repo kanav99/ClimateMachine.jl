@@ -380,7 +380,7 @@ function main()
     cb_vtk =
         GenericCallbacks.EveryXSimulationSteps(output_freq) do (init = false)
             out_dirname = @sprintf(
-                "new_ex_2_mpirank%04d_step%04d",
+                "fast_new_ex_2_mpirank%04d_step%04d",
                 MPI.Comm_rank(mpicomm),
                 step[1]
             )
