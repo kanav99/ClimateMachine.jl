@@ -309,11 +309,11 @@ function main()
 
     # time stepping
     t_ini = FT(0)
-    t_end = FT(2 * 60)
+    t_end = FT(10 * 60)
     dt = FT(5)
     #CFL = FT(1.75)
     filter_freq = 1
-    output_freq = 72
+    output_freq = 10 #72
 
     driver_config = config_kinematic_eddy(
         FT,
