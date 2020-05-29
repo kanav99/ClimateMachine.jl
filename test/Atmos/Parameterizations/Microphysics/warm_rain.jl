@@ -178,7 +178,7 @@ end
     u = state.ρu / state.ρ
     q_rai::FT = state.ρq_rai / state.ρ
 
-    rain_w = terminal_velocity(param_set, rain_param_set, state.ρ, aux.q_rai)
+    rain_w = terminal_velocity(param_set, rain_param_set, state.ρ, q_rai)
     nu = nM[1] * u[1] + nM[3] * max(u[3], rain_w, u[3] - rain_w)
 
     return abs(nu)
@@ -194,7 +194,7 @@ end
     FT = eltype(state)
     q_rai::FT = state.ρq_rai / state.ρ
 
-    rain_w = terminal_velocity(param_set, rain_param_set, state.ρ, aux.q_rai)
+    rain_w = terminal_velocity(param_set, rain_param_set, state.ρ, q_rai)
 
     # advect moisture ...
     flux.ρq_tot = SVector(
@@ -383,7 +383,7 @@ function main()
     cb_vtk =
         GenericCallbacks.EveryXSimulationSteps(output_freq) do (init = false)
             out_dirname = @sprintf(
-                "new_ex_2_mpirank%04d_step%04d",
+                "test_slow_ex_2_mpirank%04d_step%04d",
                 MPI.Comm_rank(mpicomm),
                 step[1]
             )
