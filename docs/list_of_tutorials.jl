@@ -65,10 +65,11 @@ if generate_tutorials
         ],
         "Ocean" => Any[],
         "Land" => Any["Heat" => Any["Heat Equation" => "generated/Land/Heat/heat_equation.md"],],
-        "Numerics" => Any["LinearSolvers" => Any[
-            "Conjugate Gradient" => "generated/Numerics/LinearSolvers/cg.md",
-            "Batched Generalized Minimal Residual" => "generated/Numerics/LinearSolvers/bgmres.md",
+        "Numerics" => Any["SystemSolvers" => Any[
+            "Conjugate Gradient" => "generated/Numerics/SystemSolvers/cg.md",
+            "Batched Generalized Minimal Residual" => "generated/Numerics/SystemSolvers/bgmres.md",
         ],],
+        "Diagnostics" => Any["Debug" => Any["State Statistics Regression" => "generated/Diagnostics/Debug/StateCheck.md",],],
         "Contributing" => Any["Notes on Literate" => "generated/literate_markdown.md",],
     ]
 

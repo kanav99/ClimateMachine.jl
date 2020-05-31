@@ -103,15 +103,17 @@ function tested_profiles(
     # This is exact when `RS <= 1` and gives super-saturated states
     # with non-zero condensate for `RS > 1`. In the latter case,
     # the density is only approximate.
-    q_tot = vapor_specific_humidity.(Ref(param_set), T, p, RS)
+    phase_type = PhaseEquil # TODO: Verify this!
+    q_tot = vapor_specific_humidity.(Ref(param_set), T, p, RS, Ref(phase_type))
     q_liq = max.(Ref(0), RS .- 1) .* q_tot
     q_pt = PhasePartition.(q_tot, q_liq, Ref(FT(0)))
     R_m = gas_constant_air.(Ref(param_set), q_pt)
     ρ = p ./ (R_m .* T)
     # Additional variables
-    q_sat = q_vap_saturation.(Ref(param_set), T, ρ)
+    q_sat = q_vap_saturation.(Ref(param_set), T, ρ, Ref(phase_type))
     q_tot = min.(RS .* q_sat, FT(1))
-    q_pt = PhasePartition_equil.(Ref(param_set), T, ρ, q_tot)
+    q_pt = PhasePartition_equil.(Ref(param_set), T, ρ, q_tot, Ref(phase_type))
+
     e_int = internal_energy.(Ref(param_set), T, q_pt)
     θ_liq_ice = liquid_ice_pottemp.(Ref(param_set), T, ρ, q_pt)
 
