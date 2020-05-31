@@ -147,7 +147,7 @@ specific_volume(ts::ThermodynamicState) = 1 / air_density(ts)
 Total specific humidity given
  - `ts` a thermodynamic state
 or
- - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `param_set` an `AbstractParameterSet`, see the [`Thermodynamics`](@ref) for more details
  - `T` temperature
  - `p` pressure
  - `relative_humidity` relative humidity (can exceed 1 when there is super saturation/condensate)
@@ -165,7 +165,7 @@ total_specific_humidity(ts::PhaseNonEquil) = ts.q.tot
         ) where {FT<:AbstractFloat}
 
 Vapor specific humidity, given
- - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `param_set` an `AbstractParameterSet`, see the [`Thermodynamics`](@ref) for more details
  - `T` air temperature
  - `p` pressure
  - `RH` relative humidity
@@ -1418,7 +1418,7 @@ dry_pottemp(ts::ThermodynamicState) = dry_pottemp(
 
 The air temperature and `q_tot` where
 
- - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `param_set` an `AbstractParameterSet`, see the [`Thermodynamics`](@ref) for more details
  - `T_virt` virtual temperature
  - `p` air pressure
  - `RH` relative humidity
@@ -1599,7 +1599,7 @@ virtual_pottemp(ts::ThermodynamicState) = virtual_pottemp(
 
 The virtual temperature where
 
- - `param_set` an `AbstractParameterSet`, see the [`MoistThermodynamics`](@ref) for more details
+ - `param_set` an `AbstractParameterSet`, see the [`Thermodynamics`](@ref) for more details
  - `T` temperature
  - `ρ` (moist-)air density
 and, optionally,

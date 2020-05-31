@@ -141,20 +141,19 @@ thermodynamic state into one of:
 
 ## Tested Profiles
 
-MoistThermodynamics.jl is tested using a set of profiles, or thermodynamic states, specified in [`tested_profiles`](@ref MoistThermodynamics.tested_profiles).
+Thermodynamics.jl is tested using a set of profiles, or thermodynamic states, specified in [`tested_profiles`](@ref Thermodynamics.tested_profiles).
 
 ### Dry Phase
 
 ```@example
-using CLIMA.MoistThermodynamics
-MT = MoistThermodynamics
+using CLIMA.Thermodynamics
 using CLIMAParameters
 using CLIMAParameters.Planet
 using Plots
 struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
 FT = Float64;
-include(joinpath(repeat([".."], 4),"test", "Common", "MoistThermodynamics", "profiles.jl"))
+include(joinpath(repeat([".."], 4),"test", "Common", "Thermodynamics", "profiles.jl"))
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = tested_profiles(param_set, 50, FT);
 mask_dry = q_tot .≈ 0;
 ρ_dry = ρ[mask_dry];
@@ -167,15 +166,14 @@ savefig("tested_profiles_dry.svg");
 ### Moist Phase in thermodynamic equilibrium
 
 ```@example
-using CLIMA.MoistThermodynamics
-MT = MoistThermodynamics
+using CLIMA.Thermodynamics
 using CLIMAParameters
 using CLIMAParameters.Planet
 using Plots
 struct EarthParameterSet <: AbstractEarthParameterSet end;
 const param_set = EarthParameterSet();
 FT = Float64;
-include(joinpath(repeat([".."], 4),"test", "Common", "MoistThermodynamics", "profiles.jl"))
+include(joinpath(repeat([".."], 4),"test", "Common", "Thermodynamics", "profiles.jl"))
 z, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice = tested_profiles(param_set, 50, FT);
 p1 = scatter(ρ, z./10^3, xlabel="Density [kg/m^3]", ylabel="z [km]", title="Density");
 p2 = scatter(T, z./10^3, xlabel="Temperature [K]", ylabel="z [km]", title="Temperature");
