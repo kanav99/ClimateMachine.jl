@@ -9,6 +9,7 @@ using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.Mesh.Grids
 using ClimateMachine.Mesh.Filters
+using ClimateMachine.TemperatureProfiles
 using ClimateMachine.MoistThermodynamics
 using ClimateMachine.VariableTemplates
 
@@ -194,7 +195,6 @@ dgn_config = setup_dump_state_and_aux_diagnostics(
     interval,
     driver_config.name,
     interpol = interpol,
-    project = true,
 )
 nothing # hide
 

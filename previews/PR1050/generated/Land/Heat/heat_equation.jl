@@ -10,17 +10,16 @@ const param_set = EarthParameterSet()
 using ClimateMachine
 using ClimateMachine.Mesh.Topologies
 using ClimateMachine.Mesh.Grids
-using ClimateMachine.Writers
-using ClimateMachine.DGmethods
-using ClimateMachine.DGmethods.NumericalFluxes
-using ClimateMachine.DGmethods: BalanceLaw, LocalGeometry
+using ClimateMachine.DGMethods
+using ClimateMachine.DGMethods.NumericalFluxes
+using ClimateMachine.DGMethods: BalanceLaw, LocalGeometry
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.VariableTemplates
 using ClimateMachine.SingleStackUtils
 
-import ClimateMachine.DGmethods:
+import ClimateMachine.DGMethods:
     vars_state_auxiliary,
     vars_state_conservative,
     vars_state_gradient,
@@ -122,7 +121,7 @@ function compute_gradient_flux!(
     aux::Vars,
     t::Real,
 )
-    diffusive.α∇ρcT = m.α * ∇transform.ρcT
+    diffusive.α∇ρcT = -m.α * ∇transform.ρcT
 end;
 
 function source!(m::HeatModel, _...) end;
@@ -143,7 +142,7 @@ function flux_second_order!(
     aux::Vars,
     t::Real,
 )
-    flux.ρcT -= diffusive.α∇ρcT
+    flux.ρcT += diffusive.α∇ρcT
 end;
 
 function boundary_state!(
@@ -182,7 +181,7 @@ function boundary_state!(
     if bctype == 1 # bottom
         state⁺.ρcT = m.ρc * m.T_bottom
     elseif bctype == 2 # top
-        diff⁺.α∇ρcT = -n⁻ * m.flux_top
+        diff⁺.α∇ρcT = n⁻ * m.flux_top
     end
 end;
 

@@ -6,8 +6,8 @@ using Logging
 using ClimateMachine.Mesh.Topologies
 using ClimateMachine.Mesh.Grids
 using ClimateMachine.Mesh.Filters
-using ClimateMachine.DGmethods
-using ClimateMachine.DGmethods.NumericalFluxes
+using ClimateMachine.DGMethods
+using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.ODESolvers
 using LinearAlgebra
@@ -24,7 +24,7 @@ include(joinpath(
     "..",
     "test",
     "Numerics",
-    "DGmethods",
+    "DGMethods",
     "advection_diffusion",
     "advection_diffusion_model.jl",
 ))
@@ -140,7 +140,11 @@ function run(
         Filters.apply!(Q, 1, grid, TMARFilter())
     end
 
-    mkpath(vtkdir)
+    if MPI.Comm_rank(mpicomm) == 0
+        mkpath(vtkdir)
+    end
+    MPI.Barrier(mpicomm)
+
     vtkstep = 0
 
     do_output(mpicomm, vtkdir, vtkstep, dg, Q, model, "nonnegative")
@@ -209,7 +213,8 @@ let
     CFL = 1
     dt = CFL * dx / maxvelocity
 
-    vtkdir = "vtk_nonnegative"
+    vtkdir =
+        abspath(joinpath(ClimateMachine.Settings.output_dir, "vtk_nonnegative"))
     outputtime = 0.0625
     dt = outputtime / ceil(Int64, outputtime / dt)
 

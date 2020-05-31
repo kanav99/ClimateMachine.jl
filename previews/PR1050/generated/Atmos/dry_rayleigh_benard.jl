@@ -9,20 +9,19 @@ using ClimateMachine
 ClimateMachine.init()
 using ClimateMachine.Atmos
 using ClimateMachine.ConfigTypes
-using ClimateMachine.DGmethods.NumericalFluxes
+using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.Mesh.Filters
-using ClimateMachine.MoistThermodynamics: TemperatureSHumEquil, internal_energy
+using ClimateMachine.MoistThermodynamics:
+    TemperatureSHumEquil_given_pressure, internal_energy
 using ClimateMachine.VariableTemplates
 
 using CLIMAParameters
 using CLIMAParameters.Planet: R_d, cp_d, cv_d, grav, MSLP
 struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
-
-const randomseed = MersenneTwister(1)
 
 struct DryRayleighBenardConvectionDataConfig{FT}
     xmin::FT
@@ -49,10 +48,10 @@ function init_problem!(bl, state, aux, (x, y, z), t)
     γ::FT = _cp_d / _cv_d
     δT =
         sinpi(6 * z / (dc.zmax - dc.zmin)) *
-        cospi(6 * z / (dc.zmax - dc.zmin)) + rand(randomseed)
+        cospi(6 * z / (dc.zmax - dc.zmin)) + rand()
     δw =
         sinpi(6 * z / (dc.zmax - dc.zmin)) *
-        cospi(6 * z / (dc.zmax - dc.zmin)) + rand(randomseed)
+        cospi(6 * z / (dc.zmax - dc.zmin)) + rand()
     ΔT = _grav / _cv_d * z + δT
     T = dc.T_bot - ΔT
     P = _MSLP * (T / dc.T_bot)^(_grav / _R_d / dc.T_lapse)
@@ -60,7 +59,7 @@ function init_problem!(bl, state, aux, (x, y, z), t)
 
     q_tot = FT(0)
     e_pot = gravitational_potential(bl.orientation, aux)
-    ts = TemperatureSHumEquil(bl.param_set, T, P, q_tot)
+    ts = TemperatureSHumEquil_given_pressure(bl.param_set, T, P, q_tot)
 
     ρu, ρv, ρw = FT(0), FT(0), ρ * δw
 
@@ -149,7 +148,11 @@ end
 
 function config_diagnostics(driver_config)
     interval = "10000steps"
-    dgngrp = setup_atmos_default_diagnostics(interval, driver_config.name)
+    dgngrp = setup_atmos_default_diagnostics(
+        AtmosLESConfigType(),
+        interval,
+        driver_config.name,
+    )
     return ClimateMachine.DiagnosticsConfiguration([dgngrp])
 end
 
