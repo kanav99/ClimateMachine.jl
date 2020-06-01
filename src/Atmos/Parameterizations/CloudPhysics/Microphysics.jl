@@ -27,7 +27,7 @@ Returns the proportionality coefficient in terminal velocity(r/r0).
 """
 function v0_rai(ρ::FT) where {FT <: Real}
 
-    _ρ_cloud_liq::FT = FT(916.7)
+    _ρ_cloud_liq::FT = FT(1e3)
     _C_drag::FT = FT(0.55)
     _grav::FT = FT(9.81)
     _r0::FT = FT(1e-3)
@@ -49,7 +49,7 @@ Utility function that unpacks microphysics parameters.
 ) where {FT <: Real}
     _n0::FT = FT(8e6*2)
     _r0::FT = FT(1e-3)
-    _m0::FT = FT(4/3. * π * 916.7) * _r0^FT(3)
+    _m0::FT = FT(4/3. * π * 1e3) * _r0^FT(3)
     _me::FT = FT(3)
     _a0::FT = FT(π) * _r0^FT(2)
     _ae::FT = FT(2)
