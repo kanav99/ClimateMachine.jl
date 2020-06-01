@@ -15,11 +15,57 @@ export FilterIndices
 abstract type AbstractFilter end
 abstract type AbstractSpectralFilter <: AbstractFilter end
 
+"""
+    AbstractFilterTarget
+
+An abstract type representing variables that the filter
+will act on
+"""
 abstract type AbstractFilterTarget end
+
+"""
+    vars_filter_state(::AbstractFilterTarget, FT)
+
+A tuple of symbols containing all state variables
+that are passed to the filter given a float type `FT`
+"""
 function vars_filter_state end
+"""
+    vars_filter_filtered(::AbstractFilterTarget, FT)
+
+A tuple of symbols containing variables that the filter
+will act on given a float type `FT`
+"""
 function vars_filter_filtered end
+
+"""
+    vars_filter_auxiliary(::AbstractFilterTarget, FT)
+
+A tuple of symbols containing the auxiliary variables that
+may be needed to compute the filter argument/result given
+a float type `FT`
+"""
 vars_filter_auxiliary(::AbstractFilterTarget, FT) = @vars()
+
+"""
+    compute_filter_argument!(::AbstractFilterTarget,
+                             state_filter::Vars,
+                             state::Vars,
+                             state_auxiliary::Vars)
+
+Compute filter argument `state_filter` based on `state`
+and `state_auxiliary`
+"""
 function compute_filter_argument! end
+"""
+    compute_filter_result!(::AbstractFilterTarget,
+                           state::Vars,
+                           state_filter::Vars,
+                           state_auxiliary::Vars)
+
+Compute filter result `state` based on the filtered state
+`state_filter` and `state_auxiliary`
+"""
 function compute_filter_result! end
 
 number_filter_state(t::AbstractFilterTarget, FT) =
@@ -29,6 +75,18 @@ number_filter_filtered(t::AbstractFilterTarget, FT) =
 number_filter_auxiliary(t::AbstractFilterTarget, FT) =
     varsize(vars_filter_auxiliary(t, FT))
 
+"""
+    FilterIndices(I)
+
+Filter variables based on their indices `I` where `I` can
+be a range or a list of indices
+
+## Examples
+```julia
+FiltersIndices(1:3)
+FiltersIndices(1, 3, 5)
+```
+"""
 struct FilterIndices{I, N} <: AbstractFilterTarget
     FilterIndices(I::Integer...) = new{I, maximum(I)}()
     FilterIndices(I::AbstractRange) = new{I, maximum(I)}()
@@ -173,7 +231,7 @@ This filter can be applied to the 3rd and 4th fields of an `MPIStateArray` `Q`
 with the code
 
 ```julia
-Filters.apply!(Q, (3, 4), grid, TMARFilter())
+Filters.apply!(Q, FilterIndices(3, 4), grid, TMARFilter())
 ```
 
 where `grid` is the associated `DiscontinuousSpectralElementGrid`.
@@ -181,11 +239,12 @@ where `grid` is the associated `DiscontinuousSpectralElementGrid`.
 struct TMARFilter <: AbstractFilter end
 
 """
-    apply!(Q, states, grid::DiscontinuousSpectralElementGrid,
-           filter::AbstractSpectralFilter,
-           direction::Direction = EveryDirection())
+    apply!(Q, target, grid::DiscontinuousSpectralElementGrid,
+           filter::AbstractSpectralFilter;
+           direction::Direction = EveryDirection(),
+           state_auxiliary = nothing)
 
-Applies `filter` to the `states` of `Q`.
+Applies `filter` to `Q` given a state target `target`.
 
 The `direction` argument controls if the filter is applied in the horizontal
 and/or vertical directions. It is assumed that the trailing dimension on the
@@ -229,11 +288,11 @@ function apply!(
 end
 
 """
-    apply!(Q, states, grid::DiscontinuousSpectralElementGrid, ::TMARFilter)
+    apply!(Q, target, grid::DiscontinuousSpectralElementGrid, ::TMARFilter)
 
-Applies the truncation and mass aware rescaling to `states` of `Q`.  This
-rescaling keeps the states nonegative while keeping the element average
-the same.
+Applies the truncation and mass aware rescaling to `Q` given a
+state target `target`. This rescaling keeps the states nonegative
+while keeping the element average the same.
 """
 function apply!(
     Q,
@@ -270,11 +329,12 @@ end
 const _M = Grids._M
 
 @doc """
-    kernel_apply_filter!(::Val{dim}, ::Val{N}, ::Val{nstate}, ::Val{direction},
-                      Q, ::Val{states}, filtermatrix,
-                      elems) where {dim, N, nstate, states, direction}
+    kernel_apply_filter!(::Val{dim}, ::Val{N}, direction,
+                         Q, state_auxiliary, target, filtermatrix
+                        ) where {dim, N}
 
-Computational kernel: Applies the `filtermatrix` to the `states` of `Q`.
+Computational kernel: Applies the `filtermatrix` to `Q` given a
+state target `target`.
 
 The `direction` argument is used to control if the filter is applied in the
 horizontal and/or vertical reference directions.

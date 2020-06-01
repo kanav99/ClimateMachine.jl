@@ -14,6 +14,21 @@ function calculate_dt(dg, model, Q, Courant_number, t, direction)
 end
 
 using ..Mesh.Filters: FilterIndices
+
+"""
+    FilterStateConservative(model, vars...)
+
+Filter state conservative variables of a given `model`
+based on their names `vars` where `vars` is either a list
+of symbols or strings
+
+## Examples
+```julia
+FiltersStateConservative(model) # applies to the whole state
+FiltersStateConservative(model, :ρe, :(moisture.ρq_tot))
+FiltersStateConservative(model, "ρe", "moisture.ρq_tot")
+```
+"""
 function FilterStateConservative(
     model,
     vars... = fieldnames(vars_state_conservative(model, Int))...,
