@@ -14,6 +14,7 @@ using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.Mesh.Filters
+using ClimateMachine.DGMethods: FilterStateConservative
 using ClimateMachine.Thermodynamics:
     TemperatureSHumEquil_given_pressure, internal_energy
 using ClimateMachine.VariableTemplates
