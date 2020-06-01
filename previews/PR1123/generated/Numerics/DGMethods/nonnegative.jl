@@ -6,8 +6,8 @@ using Logging
 using ClimateMachine.Mesh.Topologies
 using ClimateMachine.Mesh.Grids
 using ClimateMachine.Mesh.Filters
-using ClimateMachine.DGmethods
-using ClimateMachine.DGmethods.NumericalFluxes
+using ClimateMachine.DGMethods
+using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.ODESolvers
 using LinearAlgebra
@@ -24,7 +24,7 @@ include(joinpath(
     "..",
     "test",
     "Numerics",
-    "DGmethods",
+    "DGMethods",
     "advection_diffusion",
     "advection_diffusion_model.jl",
 ))
