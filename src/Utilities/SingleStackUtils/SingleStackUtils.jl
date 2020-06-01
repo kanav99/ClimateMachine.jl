@@ -2,9 +2,9 @@ module SingleStackUtils
 
 export get_vars_from_nodal_stack, get_vars_from_element_stack
 
+using KernalAbtractions
 using OrderedCollections
 using StaticArrays
-import KernelAbstractions: CPU
 
 using ..DGMethods
 using ..DGMethods.Grids
@@ -108,6 +108,73 @@ function get_vars_from_element_stack(
             exclude = exclude,
         ) for i in 1:Nq, j in 1:Nq
     ]
+end
+
+"""
+    reduce_element_stack(
+        f::Function,
+        grid::DiscontinuousSpectralElementGrid{T, dim, N},
+        Q::MPIStateArray,
+        vars::NamedTuple,
+        var::String;
+        vrange::UnitRange = 1:size(Q, 3),
+    ) where {T, dim, N}
+
+Reduce `var` from `vars` within `Q` over all nodal points in the specified
+`vrange` of elements with `op`. Return a tuple `(result, z)` where `result` is
+the final value returned by `op` and `z` is the index within `vrange` where the
+`result` was determined.
+"""
+function reduce_element_stack(
+    op::Function,
+    grid::DiscontinuousSpectralElementGrid{T, dim, N},
+    Q::MPIStateArray,
+    vars::NamedTuple,
+    var::Symbol;
+    vrange::UnitRange = 1:size(Q, 3),
+) where {T, dim, N}
+    Nq = N + 1
+    Nqk = dimensionality(grid) == 2 ? 1 : Nq
+    nvertelem = grid.topology.stacksize
+
+    var_names = flattenednames(vars)
+    var_ind = findfirst(s -> s == var, var_names)
+    if var_ind === nothing
+        return
+    end
+
+    # TODO: make this a KernelAbstractions kernel
+    host_Q = array_device(Q) isa CPU ? Q.realdata : Array(Q.realdata)
+    z = vrange.start
+    result = Q[1, var_ind, z]
+    for ev in vrange
+        for k in 1:Nqk
+            for j = 1:Nq
+                for i = 1:Nq
+                    ijk = i + Nq * ((j - 1) + Nq * (k - 1))
+                    new_result = op(result, Q[ijk, var_ind, ev])
+                    if !isequal(new_result, result)
+                        result = new_result
+                        z = ev
+                    end
+                end
+            end
+        end
+    end
+
+    #=
+    device = array_device(Q)
+    event = Event(device)
+    event = kernel_reduce_element_stack(device, (Nq, Nqk))(
+    )
+    wait(event)
+    =#
+
+    return (result, z)
+end
+
+@kernel function kernel_reduce_element_stack(
+)
 end
 
 end # module
