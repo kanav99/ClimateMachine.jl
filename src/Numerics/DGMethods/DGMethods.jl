@@ -11,7 +11,11 @@ using KernelAbstractions
 using KernelAbstractions.Extras: @unroll
 
 export BalanceLaw,
-    DGModel, init_ode_state, restart_ode_state, restart_auxiliary_state
+    DGModel,
+    init_ode_state,
+    restart_ode_state,
+    restart_auxiliary_state,
+    FilterStateConservative
 
 include("balance_law.jl")
 include("NumericalFluxes.jl")

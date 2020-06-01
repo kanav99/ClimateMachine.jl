@@ -14,6 +14,7 @@ using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.ODESolvers
 using ClimateMachine.Mesh.Filters
+using ClimateMachine.DGMethods: FilterStateConservative
 using ClimateMachine.Thermodynamics:
     TemperatureSHumEquil_given_pressure, internal_energy
 using ClimateMachine.VariableTemplates
@@ -213,7 +214,10 @@ function main()
                 GenericCallbacks.EveryXSimulationSteps(1) do (init = false)
                     Filters.apply!(
                         solver_config.Q,
-                        6,
+                        FilterStateConservative(
+                            driver_config.bl,
+                            :(moisture.ρq_tot),
+                        ),
                         solver_config.dg.grid,
                         TMARFilter(),
                     )

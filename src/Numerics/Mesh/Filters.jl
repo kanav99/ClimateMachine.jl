@@ -1,14 +1,65 @@
 module Filters
 
 using LinearAlgebra, GaussQuadrature, KernelAbstractions
+using KernelAbstractions.Extras: @unroll
+using StaticArrays
 using ..Grids
 using ..Grids: Direction, EveryDirection, HorizontalDirection, VerticalDirection
 
+using ...VariableTemplates: @vars, varsize, Vars
+
 export AbstractSpectralFilter, AbstractFilter
 export ExponentialFilter, CutoffFilter, TMARFilter
+export FilterIndices
 
 abstract type AbstractFilter end
 abstract type AbstractSpectralFilter <: AbstractFilter end
+
+abstract type AbstractFilterTarget end
+function vars_filter_state end
+function vars_filter_filtered end
+vars_filter_auxiliary(::AbstractFilterTarget, FT) = @vars()
+function compute_filter_argument! end
+function compute_filter_result! end
+
+number_filter_state(t::AbstractFilterTarget, FT) =
+    varsize(vars_filter_state(t, FT))
+number_filter_filtered(t::AbstractFilterTarget, FT) =
+    varsize(vars_filter_filtered(t, FT))
+number_filter_auxiliary(t::AbstractFilterTarget, FT) =
+    varsize(vars_filter_auxiliary(t, FT))
+
+struct FilterIndices{I, N} <: AbstractFilterTarget
+    FilterIndices(I::Integer...) = new{I, maximum(I)}()
+    FilterIndices(I::AbstractRange) = new{I, maximum(I)}()
+end
+vars_filter_filtered(::FilterIndices{I}, FT) where {I} =
+    @vars(_::SVector{length(I), FT})
+vars_filter_state(::FilterIndices{I, N}, FT) where {I, N} =
+    @vars(_::SVector{N, FT})
+
+function compute_filter_argument!(
+    ::FilterIndices{I},
+    filter_state::Vars,
+    state::Vars,
+    aux::Vars,
+) where {I}
+    @unroll for s in 1:length(I)
+        @inbounds parent(filter_state)[s] = parent(state)[I[s]]
+    end
+end
+
+function compute_filter_result!(
+    ::FilterIndices{I},
+    state::Vars,
+    filter_state::Vars,
+    aux::Vars,
+) where {I}
+    @unroll for s in 1:length(I)
+        @inbounds parent(state)[I[s]] = parent(filter_state)[s]
+    end
+end
+
 
 """
     spectral_filter_matrix(r, Nc, σ)
@@ -142,17 +193,16 @@ reference element is the vertical dimension and the rest are horizontal.
 """
 function apply!(
     Q,
-    states,
+    target::AbstractFilterTarget,
     grid::DiscontinuousSpectralElementGrid,
-    filter::AbstractSpectralFilter,
+    filter::AbstractSpectralFilter;
     direction::Direction = EveryDirection(),
+    state_auxiliary = nothing,
 )
     topology = grid.topology
 
     dim = dimensionality(grid)
     N = polynomialorder(grid)
-
-    nstate = size(Q, 2)
 
     filtermatrix = filter.filter
     device = typeof(Q.data) <: Array ? CPU() : CUDA()
@@ -167,12 +217,11 @@ function apply!(
     event = kernel_apply_filter!(device, (Nq, Nq, Nqk))(
         Val(dim),
         Val(N),
-        Val(nstate),
-        Val(direction),
+        direction,
         Q.data,
-        Val(states),
+        isnothing(state_auxiliary) ? nothing : state_auxiliary.data,
+        target,
         filtermatrix,
-        topology.realelems;
         ndrange = (nrealelem * Nq, Nq, Nqk),
         dependencies = (event,),
     )
@@ -186,7 +235,12 @@ Applies the truncation and mass aware rescaling to `states` of `Q`.  This
 rescaling keeps the states nonegative while keeping the element average
 the same.
 """
-function apply!(Q, states, grid::DiscontinuousSpectralElementGrid, ::TMARFilter)
+function apply!(
+    Q,
+    target::FilterIndices,
+    grid::DiscontinuousSpectralElementGrid,
+    ::TMARFilter,
+)
     topology = grid.topology
 
     device = typeof(Q.data) <: Array ? CPU() : CUDA()
@@ -205,16 +259,13 @@ function apply!(Q, states, grid::DiscontinuousSpectralElementGrid, ::TMARFilter)
         Val(dim),
         Val(N),
         Q.data,
-        Val(states),
+        target,
         grid.vgeo,
-        topology.realelems;
         dependencies = (event,),
     )
     wait(device, event)
 end
 
-using ..Mesh.Grids: EveryDirection, VerticalDirection, HorizontalDirection
-using KernelAbstractions.Extras: @unroll
 
 const _M = Grids._M
 
@@ -231,13 +282,12 @@ horizontal and/or vertical reference directions.
 @kernel function kernel_apply_filter!(
     ::Val{dim},
     ::Val{N},
-    ::Val{nstate},
-    ::Val{direction},
+    direction,
     Q,
-    ::Val{states},
+    state_auxiliary,
+    target::AbstractFilterTarget,
     filtermatrix,
-    elems,
-) where {dim, N, nstate, direction, states}
+) where {dim, N}
     @uniform begin
         FT = eltype(Q)
 
@@ -257,27 +307,52 @@ horizontal and/or vertical reference directions.
             filterinξ3 = dim == 2 ? false : true
         end
 
-        nfilterstates = length(states)
+        nstates = number_filter_state(target, FT)
+        nfilterstates = number_filter_filtered(target, FT)
+        nfilteraux = number_filter_auxiliary(target, FT)
+
+        # ugly workaround around problems with @private
+        # hopefully will be soon fixed in KA
+        l_Q2 = MVector{nstates, FT}(undef)
+        l_Qfiltered2 = MVector{nfilterstates, FT}(undef)
     end
 
     s_filter = @localmem FT (Nq, Nq)
     s_Q = @localmem FT (Nq, Nq, Nqk, nfilterstates)
+    l_Q = @private FT (nstates,)
     l_Qfiltered = @private FT (nfilterstates,)
+    l_aux = @private FT (nfilteraux,)
 
     e = @index(Group, Linear)
     i, j, k = @index(Local, NTuple)
 
     @inbounds begin
+        ijk = i + Nq * ((j - 1) + Nq * (k - 1))
+
         s_filter[i, j] = filtermatrix[i, j]
+
+        @unroll for s in 1:nstates
+            l_Q[s] = Q[ijk, s, e]
+        end
+
+        @unroll for s in 1:nfilteraux
+            l_aux[s] = state_auxiliary[ijk, s, e]
+        end
+
+        fill!(l_Qfiltered2, -zero(FT))
+        compute_filter_argument!(
+            target,
+            Vars{vars_filter_filtered(target, FT)}(l_Qfiltered2),
+            Vars{vars_filter_state(target, FT)}(l_Q[:]),
+            Vars{vars_filter_auxiliary(target, FT)}(l_aux[:]),
+        )
 
         @unroll for fs in 1:nfilterstates
             l_Qfiltered[fs] = zero(FT)
         end
 
-        ijk = i + Nq * ((j - 1) + Nq * (k - 1))
-
         @unroll for fs in 1:nfilterstates
-            s_Q[i, j, k, fs] = Q[ijk, states[fs], e]
+            s_Q[i, j, k, fs] = l_Qfiltered2[fs]
         end
 
         if filterinξ1
@@ -323,10 +398,21 @@ horizontal and/or vertical reference directions.
             end
         end
 
+        @unroll for s in 1:nstates
+            l_Q2[s] = l_Q[s]
+        end
+
+        compute_filter_result!(
+            target,
+            Vars{vars_filter_state(target, FT)}(l_Q2),
+            Vars{vars_filter_filtered(target, FT)}(l_Qfiltered[:]),
+            Vars{vars_filter_auxiliary(target, FT)}(l_aux[:]),
+        )
+
         # Store result
         ijk = i + Nq * ((j - 1) + Nq * (k - 1))
-        @unroll for fs in 1:nfilterstates
-            Q[ijk, states[fs], e] = l_Qfiltered[fs]
+        @unroll for s in 1:nstates
+            Q[ijk, s, e] = l_Q2[s]
         end
 
         @synchronize
@@ -338,17 +424,16 @@ end
     ::Val{dim},
     ::Val{N},
     Q,
-    ::Val{filterstates},
+    target::FilterIndices{I},
     vgeo,
-    elems,
-) where {nreduce, dim, N, filterstates}
+) where {nreduce, dim, N, I}
     @uniform begin
         FT = eltype(Q)
 
         Nq = N + 1
         Nqj = dim == 2 ? 1 : Nq
 
-        nfilterstates = length(filterstates)
+        nfilterstates = number_filter_state(target, FT)
         nelemperblock = 1
     end
 
@@ -367,7 +452,7 @@ end
             ijk = i + Nq * ((j - 1) + Nqj * (k - 1))
 
             @unroll for sf in 1:nfilterstates
-                s = filterstates[sf]
+                s = I[sf]
                 l_Q[sf, k] = Q[ijk, s, e]
             end
 
@@ -413,7 +498,7 @@ end
 
             r = qs_average > 0 ? qs_average / qs_clipped_average : zero(FT)
 
-            s = filterstates[sf]
+            s = I[sf]
             @unroll for k in 1:Nq
                 ijk = i + Nq * ((j - 1) + Nqj * (k - 1))
 

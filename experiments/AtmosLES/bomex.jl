@@ -58,6 +58,7 @@ using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.Diagnostics
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.Mesh.Filters
+using ClimateMachine.DGMethods: FilterStateConservative
 using ClimateMachine.Mesh.Grids
 using ClimateMachine.ODESolvers
 using ClimateMachine.Thermodynamics
@@ -513,7 +514,12 @@ function main()
     dgn_config = config_diagnostics(driver_config)
 
     cbtmarfilter = GenericCallbacks.EveryXSimulationSteps(1) do (init = false)
-        Filters.apply!(solver_config.Q, 6, solver_config.dg.grid, TMARFilter())
+        Filters.apply!(
+            solver_config.Q,
+            FilterStateConservative(driver_config.bl, :(moisture.ρq_tot)),
+            solver_config.dg.grid,
+            TMARFilter(),
+        )
         nothing
     end
 

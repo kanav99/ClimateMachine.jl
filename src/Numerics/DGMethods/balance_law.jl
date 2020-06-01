@@ -13,6 +13,30 @@ function calculate_dt(dg, model, Q, Courant_number, t, direction)
     return Courant_number / CFL
 end
 
+using ..Mesh.Filters: FilterIndices
+function FilterStateConservative(
+    model,
+    vars... = fieldnames(vars_state_conservative(model, Int))...,
+)
+    # compute indices and create an index target
+    I = Int[]
+    for var in vars
+        if occursin('.', string(var))
+            submodel, var = rsplit(string(var), '.'; limit = 2)
+            vi = varsindex(
+                vars_state_conservative(
+                    getproperty(model, Symbol(submodel)),
+                    Int,
+                ),
+                Symbol(var),
+            )
+        else
+            vi = varsindex(vars_state_conservative(model, Int), Symbol(var))
+        end
+        append!(I, collect(vi))
+    end
+    return FilterIndices(I...)
+end
 
 function create_conservative_state(balance_law::BalanceLaw, grid)
     topology = grid.topology
