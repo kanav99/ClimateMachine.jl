@@ -15,7 +15,7 @@ using ClimateMachine.Mesh.Filters
 
 using ClimateMachine.TemperatureProfiles
 
-using ClimateMachine.MoistThermodynamics
+using ClimateMachine.Thermodynamics
 
 using ClimateMachine.VariableTemplates
 
@@ -137,7 +137,11 @@ end
 
 function config_diagnostics(driver_config)
     interval = "10000steps"
-    dgngrp = setup_atmos_default_diagnostics(interval, driver_config.name)
+    dgngrp = setup_atmos_default_diagnostics(
+        AtmosLESConfigType(),
+        interval,
+        driver_config.name,
+    )
     return ClimateMachine.DiagnosticsConfiguration([dgngrp])
 end
 
