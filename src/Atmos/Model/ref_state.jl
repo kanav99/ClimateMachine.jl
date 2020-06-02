@@ -67,24 +67,18 @@ function atmos_init_aux!(
     ρ = p / (_R_d * T_virt)
     aux.ref_state.ρ = ρ
     aux.ref_state.p = p
+    RH = relative_humidity(m)
+    T = temperature_from_virtual_temperature(atmos.param_set, T_virt, RH, p)
     # We evaluate the saturation vapor pressure, approximating
     # temperature by virtual temperature
-    # ts = TemperatureSHumEquil(atmos.param_set, T_virt, ρ, FT(0))
-    ts = PhaseDry_given_ρT(atmos.param_set, ρ, T_virt)
-    q_vap_sat = q_vap_saturation(ts)
+    q_tot = vapor_specific_humidity(atmos.param_set, T, p, RH)
+    ts = TemperatureSHumEquil(atmos.param_set, T, ρ, q_tot)
 
-    ρq_tot = ρ * relative_humidity(m) * q_vap_sat
-    aux.ref_state.ρq_tot = ρq_tot
-
-    q_pt = PhasePartition(ρq_tot)
-    R_m = gas_constant_air(atmos.param_set, q_pt)
-    T = T_virt * R_m / _R_d
+    aux.ref_state.ρq_tot = ρ * q_tot
     aux.ref_state.T = T
-    aux.ref_state.ρe = ρ * internal_energy(atmos.param_set, T, q_pt)
-
     e_kin = F(0)
     e_pot = gravitational_potential(atmos.orientation, aux)
-    aux.ref_state.ρe = ρ * total_energy(atmos.param_set, e_kin, e_pot, T, q_pt)
+    aux.ref_state.ρe = ρ * total_energy(atmos.param_set, e_kin, e_pot, ts)
 end
 
 """
