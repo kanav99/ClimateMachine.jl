@@ -796,8 +796,10 @@ array_device(Q::MPIStateArray) = array_device(Q.data)
 # better names, for example `device` is also defined in CUDAdrv
 
 device(::Union{Array, SArray, MArray}) = CPU()
-device(Q::MPIDestArray) = device(parent(Q))
 device(Q::MPIStateArray) = device(Q.data)
+for (W, _) in Adapt.wrappers
+    @eval device(wrapper::$W where {AT <: Any}) = device(parent(wrapper))
+end
 
 realview(Q::Union{Array, SArray, MArray}) = Q
 realview(Q::MPIDestArray) = realview(parent(Q))

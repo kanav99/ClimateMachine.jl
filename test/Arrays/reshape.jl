@@ -1,10 +1,10 @@
 using MPI
 using Test
-using CLIMA
-using CLIMA.MPIStateArrays
+using ClimateMachine
+using ClimateMachine.MPIStateArrays
 
-CLIMA.init()
-ArrayType = CLIMA.array_type()
+ClimateMachine.init()
+ArrayType = ClimateMachine.array_type()
 mpicomm = MPI.COMM_WORLD
 FT = Float32
 Q = MPIStateArray{FT}(mpicomm, ArrayType, 4, 4, 4)
@@ -14,7 +14,7 @@ Q .= 1
 Qb .= 1
 
 @testset "MPIStateArray Reshape basics" begin
-    CLIMA.gpu_allowscalar(true)
+    ClimateMachine.gpu_allowscalar(true)
     @test minimum(Q[:] .== 1)
     @test minimum(Qb[:] .== 1)
 
@@ -32,5 +32,5 @@ Qb .= 1
 
     Qb[8, 1, 1] = 2fillval
     @test Qb[8,1,1] != fillval
-    CLIMA.gpu_allowscalar(false)
+    ClimateMachine.gpu_allowscalar(false)
 end
