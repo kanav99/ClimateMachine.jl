@@ -72,7 +72,7 @@ function atmos_init_aux!(
     aux.ref_state.ρ = ρ
     aux.ref_state.p = p
     RH = m.relative_humidity
-    T = temperature_from_virtual_temperature(atmos.param_set, T_virt, RH, p)
+    T = air_temperature_from_virtual_temperature(atmos.param_set, T_virt, RH, p)
 
     q_tot = vapor_specific_humidity(atmos.param_set, T, p, RH)
     ts = TemperatureSHumEquil(atmos.param_set, T, ρ, q_tot)

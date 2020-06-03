@@ -1,5 +1,6 @@
 using Test
 using ClimateMachine.Thermodynamics
+using ClimateMachine.TemperatureProfiles
 using NCDatasets
 using Random
 using RootSolvers
@@ -746,6 +747,10 @@ end
         )
 
 
+        # To test:
+        # compute temperature from air_temperature_from_virtual_temperature
+        # given T_virt and RH and make sure this is equal to input temperature
+        # invert to make sure we get T back (mask for RH < 1).
         T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
         RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
         mask = RH .< 1

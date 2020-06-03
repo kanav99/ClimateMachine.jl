@@ -33,6 +33,7 @@ export air_temperature_from_liquid_ice_pottemp,
 export air_temperature_from_liquid_ice_pottemp_non_linear
 export vapor_specific_humidity
 export virtual_temperature
+export air_temperature_from_virtual_temperature
 
 """
     gas_constant_air(param_set, [q::PhasePartition])
@@ -1442,7 +1443,7 @@ function air_temperature_from_virtual_temperature(
         ρ = p/(_R_d*T_virt)
         q_vap = vapor_specific_humidity(param_set, T, p, RH, phase_type)
         q_tot = q_vap
-        q_pt = PhasePartition_equil(param_set, T, ρ, q_tot)
+        q_pt = PhasePartition_equil(param_set, T, ρ, q_tot, phase_type)
         R_m = gas_constant_air(param_set, q_pt)
         return _R_d/R_m*T_virt
     end

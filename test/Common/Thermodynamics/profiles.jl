@@ -78,38 +78,56 @@ function tested_profiles(
     T_min = FT(150)
     T_surface = FT(350)
 
-    T = zeros(FT, n, n_RS)
-    p = zeros(FT, n, n_RS)
-    ρ = zeros(FT, n, n_RS)
-    RS = zeros(FT, n, n_RS)
-    z_all = zeros(FT, n, n_RS)
+    T_virt = zeros(FT, n , n_RS)
+    p = zeros(FT, n , n_RS)
+    ρ = zeros(FT, n , n_RS)
+    RS = zeros(FT, n , n_RS)
+    z_all = zeros(FT, n , n_RS)
+
+    prof = DecayingTemperatureProfile{FT}(param_set, T_surface, T_min)
+
     for i in eachindex(z_range)
         for j in eachindex(relative_sat)
-            args = temperature_and_pressure(param_set, z_range[i], T_surface, T_min)
             k = CartesianIndex(i, j)
             z_all[k] = z_range[i]
-            T[k] = args[1]
-            p[k] = args[2]
+
+            T_virt[k], p[k] = prof(param_set, z_all[k])
+
             RS[k] = relative_sat[j]
         end
     end
-    T = reshape(T, n * n_RS)
-    p = reshape(p, n * n_RS)
-    RS = reshape(RS, n * n_RS)
 
-    # Compute the vapor specific humidity given the temperature,
-    # pressure and relative humidity, and use that as the total
-    # specific humidity.
-    # This is exact when `RS <= 1` and gives super-saturated states
-    # with non-zero condensate for `RS > 1`. In the latter case,
-    # the density is only approximate.
+    T_virt = reshape(T_virt, n * n_RS)
+    p = reshape(p, n * n_RS)
+    ρ = reshape(ρ, n * n_RS)
+    RS = reshape(RS, n * n_RS)
+    z_all = reshape(z_all, n * n_RS)
+
+
     phase_type = PhaseEquil # TODO: Verify this!
+    T = air_temperature_from_virtual_temperature.(
+        Ref(param_set), T_virt,
+        p,
+        RS,
+        Ref(phase_type),
+        ResidualTolerance{FT}(1e-1),
+        10
+        )
+
+    # Compute total specific humidity from temperature, pressure
+    # and relative saturation, and partition the saturation excess
+    # according to temperature.
     q_tot = vapor_specific_humidity.(Ref(param_set), T, p, RS, Ref(phase_type))
-    q_liq = max.(Ref(0), RS .- 1) .* q_tot
-    q_pt = PhasePartition.(q_tot, q_liq, Ref(FT(0)))
+    liq_frac = liquid_fraction.(Ref(param_set), T, Ref(phase_type))
+    q_liq = max.(Ref(0), RS .- 1) .* q_tot .* liq_frac
+    q_ice = max.(Ref(0), RS .- 1) .* q_tot .* (1 .- liq_frac)
+
+    q_pt = PhasePartition.(q_tot, q_liq, q_ice)
     R_m = gas_constant_air.(Ref(param_set), q_pt)
     ρ = p ./ (R_m .* T)
-    # Additional variables
+
+    # Recompute phase partition given the density to get
+    # an accurate partition of condensed phases.
     q_sat = q_vap_saturation.(Ref(param_set), T, ρ, Ref(phase_type))
     q_tot = min.(RS .* q_sat, FT(1))
     q_pt = PhasePartition_equil.(Ref(param_set), T, ρ, q_tot, Ref(phase_type))
@@ -135,6 +153,7 @@ function tested_profiles(
     T         = getindex.(args, 8)
     p         = getindex.(args, 9)
     θ_liq_ice = getindex.(args, 10)
+    # Re-compute q_pt after sort!
     q_pt = PhasePartition.(q_tot, q_liq, q_ice)
     args = [z_all, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice]
     return args
