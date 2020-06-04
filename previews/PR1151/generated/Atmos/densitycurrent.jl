@@ -127,11 +127,6 @@ function config_densitycurrent(FT, N, resolution, xmax, ymax, zmax)
     return config
 end
 
-function config_diagnostics(driver_config)
-    interval = "10000steps"
-    dgngrp = setup_atmos_default_diagnostics(interval, driver_config.name)
-    return ClimateMachine.DiagnosticsConfiguration([dgngrp])
-end
 
 function main()
 
@@ -157,7 +152,6 @@ function main()
         init_on_cpu = true,
         Courant_number = CFL,
     )
-    dgn_config = config_diagnostics(driver_config)
 
     cbtmarfilter = GenericCallbacks.EveryXSimulationSteps(1) do (init = false)
         Filters.apply!(solver_config.Q, 6, solver_config.dg.grid, TMARFilter())
@@ -166,7 +160,6 @@ function main()
 
     result = ClimateMachine.invoke!(
         solver_config;
-        diagnostics_config = dgn_config,
         user_callbacks = (cbtmarfilter,),
         check_euclidean_distance = true,
     )
