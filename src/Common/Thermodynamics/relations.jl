@@ -392,12 +392,12 @@ and, optionally,
 
 """
 function total_energy(
-    param_set::APS,
-    e_kin::FT,
-    e_pot::FT,
-    T::FT,
-    q::PhasePartition{FT} = q_pt_0(FT),
-) where {FT <: Real}
+    param_set,
+    e_kin,
+    e_pot,
+    T,
+    q,
+) where {FT}
     return e_kin + e_pot + internal_energy(param_set, T, q)
 end
 
@@ -408,10 +408,10 @@ The total energy per unit mass
 given a thermodynamic state `ts`.
 """
 function total_energy(
-    e_kin::FT,
-    e_pot::FT,
-    ts::ThermodynamicState{FT},
-) where {FT <: Real}
+    e_kin,
+    e_pot,
+    ts,
+) where {FT}
     return internal_energy(ts) + e_kin + e_pot
 end
 
