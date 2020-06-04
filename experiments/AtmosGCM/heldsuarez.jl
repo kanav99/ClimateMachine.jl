@@ -238,7 +238,7 @@ function main()
     )
     # aggregate files
 
-    fnames = filter(x -> occursin(r"^Held", x), readdir("output/"))
+    fnames = filter(x -> occursin(r"^Held", x), readdir("output"))
     cd("output/")
 
     # aggregate data in output into a multi-file dataset
