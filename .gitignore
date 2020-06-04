@@ -34,3 +34,7 @@ src/**/Manifest.toml
 
 # Julia System Images
 *.so
+
+# Custom
+hpcrun*
+*.gz

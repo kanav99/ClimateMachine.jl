@@ -232,10 +232,10 @@ function atmos_gcm_default_collect(dgngrp::DiagnosticsGroup, currtime)
 
         simple_3d_vars_array = Array{FT}(
             undef,
-            1,
             nlong,
             nlat,
             nlevel,
+            1,
             num_atmos_gcm_default_simple_3d_vars(bl, FT),
         )
 
@@ -251,7 +251,7 @@ function atmos_gcm_default_collect(dgngrp::DiagnosticsGroup, currtime)
             dyni = dyn_vars(view(all_dyn_data, lo, la, le, :))
             simple_3d_vars = atmos_gcm_default_simple_3d_vars(
                 bl,
-                view(simple_3d_vars_array, 1, lo, la, le, :),
+                view(simple_3d_vars_array, lo, la, le, 1, :),
             )
 
             atmos_gcm_default_simple_3d_vars!(
@@ -264,7 +264,7 @@ function atmos_gcm_default_collect(dgngrp::DiagnosticsGroup, currtime)
         end
 
         # assemble the diagnostics for writing
-        dim_names = tuple("time", collect(keys(dims))...)
+        dim_names = tuple(collect(keys(dims))..., "time")
         varvals = OrderedDict()
         varnames = map(
             s -> startswith(s, "moisture.") ? s[10:end] : s,
@@ -293,6 +293,7 @@ function atmos_gcm_default_collect(dgngrp::DiagnosticsGroup, currtime)
         )
         dfilename = joinpath(Settings.output_dir, dprefix)
         write_data(dgngrp.writer, dfilename, dims, varvals, currtime)
+        #write_data_fini(dgngrp.writer, "ln_test.nc", "time")
     end
 
     MPI.Barrier(mpicomm)
