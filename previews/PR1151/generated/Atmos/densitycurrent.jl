@@ -1,5 +1,5 @@
 using ClimateMachine
-ClimateMachine.init()
+ClimateMachine.cli()
 
 using ClimateMachine.Atmos
 
@@ -15,7 +15,7 @@ using ClimateMachine.Mesh.Filters
 
 using ClimateMachine.TemperatureProfiles
 
-using ClimateMachine.MoistThermodynamics
+using ClimateMachine.Thermodynamics
 
 using ClimateMachine.VariableTemplates
 
