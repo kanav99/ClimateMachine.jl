@@ -54,8 +54,8 @@ include("data_tests.jl")
         _kappa_d = FT(kappa_d(param_set))
 
         # for FT in float_types
-        z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
-            tested_profiles(param_set, 50, FT)
+        profiles = PhaseEquilProfiles(param_set, FT)
+        @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
         Φ = FT(1)
         Random.seed!(15)
         perturbation = FT(0.1) * rand(length(T))
@@ -372,8 +372,8 @@ end
 
     for FT in float_types
         rtol = FT(1e-2)
-        z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
-            tested_profiles(param_set, 50, FT)
+        profiles = PhaseEquilProfiles(param_set, FT)
+        @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
 
         # PhaseEquil
         ts_exact = PhaseEquil.(Ref(param_set), e_int, ρ, q_tot, 100, FT(1e-3))
@@ -396,6 +396,14 @@ end
             air_temperature.(ts_exact),
             rtol = rtol,
         ))
+
+        dry_mask = abs.(q_tot .- 0) .< eps(FT)
+        q_dry = q_pt[dry_mask]
+        @test all(
+            condensate.(q_pt) .==
+            getproperty.(q_pt, :liq) .+ getproperty.(q_pt, :ice),
+        )
+        @test all(has_condensate.(q_dry) .== false)
 
         # PhaseEquil
         ts_exact =
@@ -570,8 +578,8 @@ end
 
         _MSLP = FT(MSLP(param_set))
 
-        z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
-            tested_profiles(param_set, 50, FT)
+        profiles = PhaseDryProfiles(param_set, FT)
+        @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
 
         # PhaseDry
         ts = PhaseDry.(Ref(param_set), e_int, ρ)
@@ -586,6 +594,9 @@ end
 
         @test all(air_density.(ts_p) .≈ air_density.(ts))
         @test all(internal_energy.(ts_p) .≈ internal_energy.(ts))
+
+        profiles = PhaseEquilProfiles(param_set, FT)
+        @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
 
         # PhaseEquil
         ts =
@@ -747,53 +758,53 @@ end
         )
 
 
-        # To test:
-        # compute temperature from air_temperature_from_virtual_temperature
-        # given T_virt and RH and make sure this is equal to input temperature
-        # invert to make sure we get T back (mask for RH < 1).
-        T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
-        RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
-        mask = RH .< 1
-        N = 5
-        R_m = gas_constant_air.(Ref(param_set), q_pt)
-        _R_d = FT(R_d(param_set))
-        R_m_mask = R_m[mask][1:N]
-        q_tot_mask = q_tot[mask][1:N]
-        T_mask = T[mask][1:N]
-        T_virt_mask = T_virt[mask][1:N]
-        p_mask = p[mask][1:N]
-        RH_mask = RH[mask][1:N]
-        @show R_m_mask / _R_d .* T_mask
-        @show R_m_mask / _R_d
-        @show T_virt_mask
-        @show T_mask
-        @show q_tot_mask
-        @show p_mask
-        @show RH_mask
-        # TODO: Add consistency test for `air_temperature_from_virtual_temperature`:
+        # # To test:
+        # # compute temperature from air_temperature_from_virtual_temperature
+        # # given T_virt and RH and make sure this is equal to input temperature
+        # # invert to make sure we get T back (mask for RH < 1).
+        # T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
+        # RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
+        # mask = RH .< 1
+        # N = 5
+        # R_m = gas_constant_air.(Ref(param_set), q_pt)
+        # _R_d = FT(R_d(param_set))
+        # R_m_mask = R_m[mask][1:N]
+        # q_tot_mask = q_tot[mask][1:N]
+        # T_mask = T[mask][1:N]
+        # T_virt_mask = T_virt[mask][1:N]
+        # p_mask = p[mask][1:N]
+        # RH_mask = RH[mask][1:N]
+        # @show R_m_mask / _R_d .* T_mask
+        # @show R_m_mask / _R_d
+        # @show T_virt_mask
+        # @show T_mask
+        # @show q_tot_mask
+        # @show p_mask
+        # @show RH_mask
+        # # TODO: Add consistency test for `air_temperature_from_virtual_temperature`:
 
-        phase_type = PhaseEquil
-        q_vap_mask = vapor_specific_humidity.(Ref(param_set), T_mask, p_mask, RH_mask, Ref(phase_type))
-        println("---------")
-        @show q_tot_mask
-        @show q_vap_mask
-        println("---------")
-        @test all(isapprox.(q_tot_mask, q_vap_mask, rtol=rtol))
+        # phase_type = PhaseEquil
+        # q_vap_mask = vapor_specific_humidity.(Ref(param_set), T_mask, p_mask, RH_mask, Ref(phase_type))
+        # println("---------")
+        # @show q_tot_mask
+        # @show q_vap_mask
+        # println("---------")
+        # @test all(isapprox.(q_tot_mask, q_vap_mask, rtol=rtol))
 
 
-        T_from_virt = MT.air_temperature_from_virtual_temperature.(
-            Ref(param_set),
-            T_virt_mask,
-            p_mask,
-            RH_mask,
-            Ref(ResidualTolerance(FT(1e-2))),
-            Ref(10)
-            )
+        # T_from_virt = MT.air_temperature_from_virtual_temperature.(
+        #     Ref(param_set),
+        #     T_virt_mask,
+        #     p_mask,
+        #     RH_mask,
+        #     Ref(ResidualTolerance(FT(1e-2))),
+        #     Ref(10)
+        #     )
 
-        # @test all(T_mask .≈ T_from_virt)
-        @show T_from_virt
-        @show T_mask
-        @show T_mask .- T_from_virt
+        # # @test all(T_mask .≈ T_from_virt)
+        # @show T_from_virt
+        # @show T_mask
+        # @show T_mask .- T_from_virt
     end
 
 end
@@ -804,8 +815,8 @@ end
     # NOTE: `Float32` saturation adjustment tends to have more difficulty
     # with converging to the same tolerances as `Float64`, so they're relaxed here.
     FT = Float32
-    z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
-        tested_profiles(param_set, 50, FT)
+    profiles = PhaseEquilProfiles(param_set, FT)
+    @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
 
     ρu = FT[1.0, 2.0, 3.0]
     e_pot = FT(100.0)
@@ -912,8 +923,8 @@ end
 @testset "moist thermodynamics - dry limit" begin
 
     FT = Float64
-    z, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice =
-        tested_profiles(param_set, 50, FT)
+    profiles = PhaseEquilProfiles(param_set, FT)
+    @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
 
     # PhasePartition test is noisy, so do this only once:
     ts_dry = PhaseDry(param_set, first(e_int), first(ρ))

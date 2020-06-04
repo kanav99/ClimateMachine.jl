@@ -6,107 +6,202 @@ thermodynamic _states_ that Thermodynamics is
 tested with in runtests.jl
 =#
 
-
 """
-    temperature_and_pressure(
-        param_set::AbstractParameterSet,
-        z::FT,
-        T_surface::FT,
-        T_min::FT,
-        ) where {FT <: AbstractFloat}
+    unpack_fields(_struct, syms...)
 
-Returns dry adiabatic linear temperature profile truncated at
-a minimum temperature `T_min` and the corresponding pressure
-profile for dry atmosphere.
+Unpack struct properties `syms`
+from struct `_struct`
 
- - `param_set` parameter set, used to dispatch planet parameter function calls
- - `z` altitude
- - `T_surface` surface temperature
- - `T_min` minimum temperature
+# Example
+```julia
+julia> struct Foo;a;b;c;end
+
+julia> f = Foo(1,2,3)
+Foo(1, 2, 3)
+
+julia> @unpack_fields f a c; @show a c
+a = 1
+c = 3
+```
 """
-function temperature_and_pressure(
-    param_set::AbstractParameterSet,
-    z::FT,
-    T_surface::FT,
-    T_min::FT,
-) where {FT <: AbstractFloat}
-    _grav::FT = grav(param_set)
-    _cp_d::FT = cp_d(param_set)
-    _R_d::FT = R_d(param_set)
-    _MSLP::FT = MSLP(param_set)
-    Γ = _grav / _cp_d
-    z_tropopause = (T_surface - T_min) / Γ
-    H_min = _R_d * T_min / _grav
-    T = max(T_surface - Γ * z, T_min)
-    p = _MSLP * (T / T_surface)^(_grav / (_R_d * Γ))
-    T == T_min && (p = p * exp(-(z - z_tropopause) / H_min))
-    return T, p
+macro unpack_fields(_struct, syms...)
+    thunk = Expr(:block)
+    for sym in syms
+        push!(
+            thunk.args,
+            :($(esc(sym)) = getproperty($(esc(_struct)), $(QuoteNode(sym)))),
+        )
+    end
+    push!(thunk.args, nothing)
+    return thunk
 end
 
 """
-    tested_profiles(param_set, n::Int, ::Type{FT})
+    ProfileSet
 
-A range of input arguments to thermodynamic state constructors
-
- - `param_set` an `AbstractParameterSet`, see the [`Thermodynamics`](@ref) for more details
- - `z_all` altitude
- - `e_int` internal energy
- - `ρ` (moist-)air density
- - `q_tot` total specific humidity
- - `q_pt` phase partition
- - `T` air temperature
- - `θ_liq_ice` liquid-ice potential temperature
-
-that are tested for convergence in saturation adjustment.
-
-Note that the output vectors are of size ``n*n_RS``, and they
-should span the input arguments to all of the constructors.
+A set of profiles used to test Thermodynamics.
 """
-function tested_profiles(
-    param_set::AbstractParameterSet,
-    n::Int,
-    ::Type{FT},
-) where {FT}
+struct ProfileSet{FT}
+    z::Array{FT}                        # Altitude
+    T::Array{FT}                        # Temperature
+    p::Array{FT}                        # Pressure
+    RS::Array{FT}                       # Relative humidity
+    e_int::Array{FT}                    # Internal energy
+    ρ::Array{FT}                        # Density
+    θ_liq_ice::Array{FT}                # Potential temperature
+    q_tot::Array{FT}                    # Total specific humidity
+    q_liq::Array{FT}                    # Liquid specific humidity
+    q_ice::Array{FT}                    # Ice specific humidity
+    q_pt::Array{PhasePartition{FT}}     # Phase partition
+    RH::Array{FT}                       # Relative humidity
+    SS::Array{FT}                       # Super saturation
+end
 
-    n_RS1 = 10
-    n_RS2 = 20
+"""
+    input_config(
+        FT;
+        n=50,
+        n_RS1=10,
+        n_RS2=20,
+        T_min=FT(150),
+        T_surface=FT(350)
+    ) where {FT}
+
+Return input arguments to construct profiles
+"""
+function input_config(
+    FT;
+    n = 50,
+    n_RS1 = 10,
+    n_RS2 = 20,
+    T_surface = FT(350),
+    T_min = FT(150),
+)
     n_RS = n_RS1 + n_RS2
     z_range = range(FT(0), stop = FT(2.5e4), length = n)
     relative_sat1 = range(FT(0), stop = FT(1), length = n_RS1)
     relative_sat2 = range(FT(1), stop = FT(1.02), length = n_RS2)
     relative_sat = [relative_sat1..., relative_sat2...]
-    T_min = FT(150)
-    T_surface = FT(350)
+    return z_range, relative_sat, T_surface, T_min
+end
 
-    T_virt = zeros(FT, n , n_RS)
-    p = zeros(FT, n , n_RS)
-    ρ = zeros(FT, n , n_RS)
-    RS = zeros(FT, n , n_RS)
-    z_all = zeros(FT, n , n_RS)
+"""
+    shared_profiles(
+        param_set::AbstractParameterSet,
+        z_range::AbstractArray,
+        relative_sat::AbstractArray,
+        T_surface::FT,
+        T_min::FT,
+    ) where {FT}
 
-    prof = DecayingTemperatureProfile{FT}(param_set, T_surface, T_min)
-
-    for i in eachindex(z_range)
-        for j in eachindex(relative_sat)
-            k = CartesianIndex(i, j)
-            z_all[k] = z_range[i]
-
-            T_virt[k], p[k] = prof(param_set, z_all[k])
-
+Compute profiles shared across `PhaseDry`,
+`PhaseEquil` and `PhaseNonEquil` thermodynamic
+states, including:
+ - `z` altitude
+ - `T_virt` virtual temperature
+ - `p` pressure
+ - `RS` relative saturation
+"""
+function shared_profiles(
+    param_set::AbstractParameterSet,
+    z_range::AbstractArray,
+    relative_sat::AbstractArray,
+    T_surface::FT,
+    T_min::FT,
+) where {FT}
+    n_RS = length(relative_sat)
+    n = length(z_range)
+    T_virt = Array{FT}(undef, n * n_RS)
+    p = Array{FT}(undef, n * n_RS)
+    RS = Array{FT}(undef, n * n_RS)
+    z = Array{FT}(undef, n * n_RS)
+    linear_indices = LinearIndices((1:n, 1:n_RS))
+    profile = DecayingTemperatureProfile{FT}(param_set, T_surface, T_min)
+    for i in linear_indices.indices[1]
+        for j in linear_indices.indices[2]
+            k = linear_indices[i, j]
+            z[k] = z_range[i]
+            T_virt[k], p[k] = profile(param_set, z[k])
             RS[k] = relative_sat[j]
         end
     end
+    return z, T_virt, p, RS
+end
 
-    T_virt = reshape(T_virt, n * n_RS)
-    p = reshape(p, n * n_RS)
-    ρ = reshape(ρ, n * n_RS)
-    RS = reshape(RS, n * n_RS)
-    z_all = reshape(z_all, n * n_RS)
+####
+#### PhaseDry
+####
 
+"""
+    PhaseDryProfiles(param_set, ::Type{FT})
+
+Returns a `ProfileSet` used to test dry thermodynamic states.
+"""
+function PhaseDryProfiles(
+    param_set::AbstractParameterSet,
+    ::Type{FT},
+) where {FT}
+
+    z_range, relative_sat, T_surface, T_min = input_config(FT)
+    z, T_virt, p, RS =
+        shared_profiles(param_set, z_range, relative_sat, T_surface, T_min)
+    _R_d::FT = R_d(param_set)
+    T = T_virt
+    ρ = p ./ (_R_d .* T)
+
+    # Additional variables
+    phase_type = PhaseDry
+    q_tot = zeros(FT, length(RS))
+    q_pt = PhasePartition_equil.(Ref(param_set), T, ρ, q_tot, Ref(phase_type))
+    e_int = internal_energy.(Ref(param_set), T, q_pt)
+    θ_liq_ice = liquid_ice_pottemp.(Ref(param_set), T, ρ, q_pt)
+    q_liq = getproperty.(q_pt, :liq)
+    q_ice = getproperty.(q_pt, :ice)
+    RH = relative_humidity.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+
+    # TODO: Update this once a super saturation method exists
+    # SS = super_saturation.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+    SS = zeros(FT, length(RH))
+
+    return ProfileSet(
+        z,
+        T,
+        p,
+        RS,
+        e_int,
+        ρ,
+        θ_liq_ice,
+        q_tot,
+        q_liq,
+        q_ice,
+        q_pt,
+        RH,
+        SS,
+    )
+end
+
+####
+#### PhaseEquil
+####
+
+"""
+    PhaseEquilProfiles(param_set, ::Type{FT})
+
+Returns a `ProfileSet` used to test moist states in thermodynamic equilibrium.
+"""
+function PhaseEquilProfiles(
+    param_set::AbstractParameterSet,
+    ::Type{FT},
+) where {FT}
+
+    z_range, relative_sat, T_surface, T_min = input_config(FT)
+    z, T_virt, p, RS =
+        shared_profiles(param_set, z_range, relative_sat, T_surface, T_min)
 
     phase_type = PhaseEquil # TODO: Verify this!
     T = air_temperature_from_virtual_temperature.(
-        Ref(param_set), T_virt,
+        Ref(param_set),
+        T_virt,
         p,
         RS,
         Ref(phase_type),
@@ -134,27 +229,27 @@ function tested_profiles(
 
     e_int = internal_energy.(Ref(param_set), T, q_pt)
     θ_liq_ice = liquid_ice_pottemp.(Ref(param_set), T, ρ, q_pt)
-
-    # Sort by altitude (for visualization):
-    # TODO: Refactor, by avoiding phase partition copy, once
-    # https://github.com/JuliaLang/julia/pull/33515 merges
     q_liq = getproperty.(q_pt, :liq)
     q_ice = getproperty.(q_pt, :ice)
-    args = [z_all, RS, e_int, ρ, q_tot, q_liq, q_ice, T, p, θ_liq_ice]
-    args = collect(zip(args...))
-    sort!(args)
-    z_all     = getindex.(args, 1)
-    RS        = getindex.(args, 2)
-    e_int     = getindex.(args, 3)
-    ρ         = getindex.(args, 4)
-    q_tot     = getindex.(args, 5)
-    q_liq     = getindex.(args, 6)
-    q_ice     = getindex.(args, 7)
-    T         = getindex.(args, 8)
-    p         = getindex.(args, 9)
-    θ_liq_ice = getindex.(args, 10)
-    # Re-compute q_pt after sort!
-    q_pt = PhasePartition.(q_tot, q_liq, q_ice)
-    args = [z_all, RS, e_int, ρ, q_tot, q_pt, T, p, θ_liq_ice]
-    return args
+    RH = relative_humidity.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+
+    # TODO: Update this once a super saturation method exists
+    # SS = super_saturation.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+    SS = zeros(FT, length(RH))
+
+    return ProfileSet(
+        z,
+        T,
+        p,
+        RS,
+        e_int,
+        ρ,
+        θ_liq_ice,
+        q_tot,
+        q_liq,
+        q_ice,
+        q_pt,
+        RH,
+        SS,
+    )
 end
