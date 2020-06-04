@@ -186,7 +186,7 @@ function main()
     poly_order = 5                           # discontinuous Galerkin polynomial order
     n_horz = 5                               # horizontal element number
     n_vert = 5                               # vertical element number
-    n_days = 50                              # experiment day number
+    n_days = 40                              # experiment day number
     timestart = FT(0)                        # start time (s)
     timeend = FT(n_days * day(param_set))    # end time (s)
 
@@ -237,7 +237,9 @@ function main()
         check_euclidean_distance = true,
     )
     # aggregate files
-    fnames = filter(x -> occursin(r"^Held", x), readdir())
+
+    fnames = filter(x -> occursin(r"^Held", x), readdir("output/"))
+    cd("output/")
 
     # aggregate data in output into a multi-file dataset
     mfds = NCDataset(fnames,"a"; aggdim = "time", deferopen = false)
@@ -248,7 +250,7 @@ function main()
     dim_s = size(dummy)
 
     # write data to disk as combined file
-    ds = Dataset("output/gcm_diags_aggregated.nc","c")
+    ds = Dataset("gcm_diags_aggregated.nc","c")
     for i = 1:ndims(dummy)
         if dim_n[i] == "time"
             d_s = Inf # Inf sets UNLIMITED dimension
@@ -266,9 +268,12 @@ function main()
         if v_n in vd
             defVar(ds, v_n, vv, vd, attrib = va)
         else
-            defVar(ds, v_n, permutedims(vv, [2, 3, 4, 1]), vd[[2, 3, 4, 1]], attrib = va)
+            defVar(ds, v_n, vv, vd, attrib = va) #on Cluster
+            #defVar(ds, v_n, permutedims(vv, [2, 3, 4, 1]), vd[[2, 3, 4, 1]], attrib = va) # on Mac
         end
     end
+    cd("../")
+    
     close(ds)
 end
 
