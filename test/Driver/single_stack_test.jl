@@ -126,7 +126,7 @@ Base.@kwdef struct SingleStack{FT} <: BalanceLaw
     "IC Gaussian noise standard deviation"
     σ::FT = 1e-1
     "Rayleigh damping"
-    γ::FT = μh/0.08/1e-2/1e-2;
+    γ::FT = μh / 0.08 / 1e-2 / 1e-2
     "Domain height"
     zmax::FT = 1
     "Initial conditions for temperature"
@@ -155,13 +155,15 @@ vars_state_auxiliary(::SingleStack, FT) = @vars(z::FT, T::FT);
 
 # Specify state variables, the variables solved for in the PDEs, for
 # `SingleStack`
-vars_state_conservative(::SingleStack, FT) = @vars(ρ::FT, ρu::SVector{3, FT}, ρcT::FT);
+vars_state_conservative(::SingleStack, FT) =
+    @vars(ρ::FT, ρu::SVector{3, FT}, ρcT::FT);
 
 # Specify state variables whose gradients are needed for `SingleStack`
 vars_state_gradient(::SingleStack, FT) = @vars(u::SVector{3, FT}, ρcT::FT);
 
 # Specify gradient variables for `SingleStack`
-vars_state_gradient_flux(::SingleStack, FT) = @vars(μ∇u::SMatrix{3, 3, FT, 9}, α∇ρcT::SVector{3, FT});
+vars_state_gradient_flux(::SingleStack, FT) =
+    @vars(μ∇u::SMatrix{3, 3, FT, 9}, α∇ρcT::SVector{3, FT});
 
 # ## Define the compute kernels
 
@@ -190,12 +192,12 @@ function init_state_conservative!(
     ε1 = rand(Normal(0, m.σ))
     ε2 = rand(Normal(0, m.σ))
     state.ρ = 1
-    ρu = 1 - 4*(z - m.zmax/2)^2 + ε1
-    ρv = 1 - 4*(z - m.zmax/2)^2 + ε2
+    ρu = 1 - 4 * (z - m.zmax / 2)^2 + ε1
+    ρv = 1 - 4 * (z - m.zmax / 2)^2 + ε2
     ρw = 0
-    state.ρu = SVector(ρu,ρv,ρw)
+    state.ρu = SVector(ρu, ρv, ρw)
 
-    state.ρcT = state.ρ*m.c * aux.T
+    state.ρcT = state.ρ * m.c * aux.T
 end;
 
 # The remaining methods, defined in this section, are called at every
@@ -224,7 +226,7 @@ function heat_eq_nodal_update_aux!(
     aux::Vars,
     t::Real,
 )
-    aux.T = state.ρcT / (state.ρ*m.c)
+    aux.T = state.ρcT / (state.ρ * m.c)
 end;
 
 # Since we have second-order fluxes, we must tell `ClimateMachine` to compute
@@ -239,7 +241,7 @@ function compute_gradient_argument!(
     t::Real,
 )
     transform.ρcT = state.ρcT
-    transform.u = state.ρu/state.ρ
+    transform.u = state.ρu / state.ρ
 end;
 
 # Specify where in `diffusive::Vars` to store the computed gradient from
@@ -267,16 +269,19 @@ end;
 #  the vertical component.
 function source!(
     m::SingleStack,
-    source::Vars, 
+    source::Vars,
     state::Vars,
-    diffusive::Vars, 
+    diffusive::Vars,
     aux::Vars,
-    args...
-) 
-    ẑ = [0.0, 0.0, 1.0];
-    ρ̄ū = state.ρ*[1 - 4*(aux.z - m.zmax/2)^2, 1 - 4*(aux.z - m.zmax/2)^2, 0.0]./2;
-    ρu_p = state.ρu - ρ̄ū;
-    source.ρu -= m.γ * (ρu_p - ẑ'*ρu_p * ẑ);
+    args...,
+)
+    ẑ = [0.0, 0.0, 1.0]
+    ρ̄ū =
+        state.ρ *
+        [1 - 4 * (aux.z - m.zmax / 2)^2, 1 - 4 * (aux.z - m.zmax / 2)^2, 0.0] ./
+        2
+    ρu_p = state.ρu - ρ̄ū
+    source.ρu -= m.γ * (ρu_p - ẑ' * ρu_p * ẑ)
 
 end;
 
@@ -337,11 +342,11 @@ function boundary_state!(
 )
     if bctype == 1 # bottom
         state⁺.ρ = 1
-        state⁺.ρu = SVector(0,0,0)
-        state⁺.ρcT = state⁺.ρ*m.c * m.T_bottom
+        state⁺.ρu = SVector(0, 0, 0)
+        state⁺.ρcT = state⁺.ρ * m.c * m.T_bottom
     elseif bctype == 2 # top
         state⁺.ρ = 1
-        state⁺.ρu = SVector(0,0,0)
+        state⁺.ρu = SVector(0, 0, 0)
     end
 end;
 
@@ -363,11 +368,11 @@ function boundary_state!(
 )
     if bctype == 1 # bottom
         state⁺.ρ = 1
-        state⁺.ρu = SVector(0,0,0)
-        state⁺.ρcT = state⁺.ρ*m.c * m.T_bottom
+        state⁺.ρu = SVector(0, 0, 0)
+        state⁺.ρcT = state⁺.ρ * m.c * m.T_bottom
     elseif bctype == 2 # top
         state⁺.ρ = 1
-        state⁺.ρu = SVector(0,0,0)
+        state⁺.ρu = SVector(0, 0, 0)
         diff⁺.α∇ρcT = -n⁻ * m.flux_top
     end
 end;
@@ -436,16 +441,16 @@ state_vars = get_vars_from_nodal_stack(
     driver_config.grid,
     solver_config.Q,
     vars_state_conservative(m, FT),
-    i = 1, 
-    j = 1
+    i = 1,
+    j = 1,
 );
 aux_vars = get_vars_from_nodal_stack(
     driver_config.grid,
     solver_config.dg.state_auxiliary,
     vars_state_auxiliary(m, FT),
-    i = 1, 
+    i = 1,
     j = 1,
-    exclude = [z_key]
+    exclude = [z_key],
 );
 all_vars = OrderedDict(state_vars..., aux_vars...);
 
@@ -481,14 +486,16 @@ export_plot_snapshot(
 
 # Horizontal statistics of variables
 state_vars_var = get_horizontal_variance(
-            driver_config.grid,
-            solver_config.Q,
-            vars_state_conservative(m, FT));
+    driver_config.grid,
+    solver_config.Q,
+    vars_state_conservative(m, FT),
+);
 
 state_vars_avg = get_horizontal_mean(
-            driver_config.grid,
-            solver_config.Q,
-            vars_state_conservative(m, FT));
+    driver_config.grid,
+    solver_config.Q,
+    vars_state_conservative(m, FT),
+);
 
 export_plot_snapshot(
     z,
@@ -568,7 +575,7 @@ export_plot(
     ("ρu[1]"),
     joinpath(output_dir, "solution_vs_time_u.png"),
     z_label,
-    xlabel="Horizontal mean rho*u"
+    xlabel = "Horizontal mean rho*u",
 );
 export_plot(
     z,
@@ -576,7 +583,7 @@ export_plot(
     ("ρu[1]"),
     joinpath(output_dir, "variance_vs_time_u.png"),
     z_label,
-    xlabel="Horizontal variance rho*u"
+    xlabel = "Horizontal variance rho*u",
 );
 export_plot(
     z,
@@ -584,7 +591,7 @@ export_plot(
     ("ρcT"),
     joinpath(output_dir, "solution_vs_time_T.png"),
     z_label,
-    xlabel="Horizontal mean rho*c*T"
+    xlabel = "Horizontal mean rho*c*T",
 );
 export_plot(
     z,
@@ -592,7 +599,7 @@ export_plot(
     ("ρu[3]"),
     joinpath(output_dir, "variance_vs_time_w.png"),
     z_label,
-    xlabel="Horizontal variance rho*w"
+    xlabel = "Horizontal variance rho*w",
 );
 # ![](solution_vs_time_u.png)
 # ![](variance_vs_time_u.png)

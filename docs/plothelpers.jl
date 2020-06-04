@@ -27,7 +27,7 @@ end
 Export plot of all variables, or all
 available time-steps in `all_data`.
 """
-function export_plot(z, all_data, ϕ_all, filename, ylabel; xlabel="")
+function export_plot(z, all_data, ϕ_all, filename, ylabel; xlabel = "")
     ϕ_all isa Tuple || (ϕ_all = (ϕ_all,))
     p = plot()
     for n in 0:(length(keys(all_data)) - 1)

@@ -138,8 +138,8 @@ function get_horizontal_mean(
     exclude::Vector{String} = String[],
 ) where {T, dim, N}
     Nq = N + 1
-    vars_avg = Dict();
-    vars_sq = Dict();
+    vars_avg = Dict()
+    vars_sq = Dict()
     for i in 1:Nq
         for j in 1:Nq
             vars_nodal = get_vars_from_nodal_stack(
@@ -150,11 +150,11 @@ function get_horizontal_mean(
                 i = i,
                 j = j,
                 exclude = exclude,
-            );
-            vars_avg = merge(+, vars_avg, vars_nodal);
+            )
+            vars_avg = merge(+, vars_avg, vars_nodal)
         end
     end
-    map!(x->x./Nq/Nq, values(vars_avg));
+    map!(x -> x ./ Nq / Nq, values(vars_avg))
     return vars_avg
 end
 
@@ -185,8 +185,8 @@ function get_horizontal_variance(
     exclude::Vector{String} = String[],
 ) where {T, dim, N}
     Nq = N + 1
-    vars_avg = Dict();
-    vars_sq = Dict();
+    vars_avg = Dict()
+    vars_sq = Dict()
     for i in 1:Nq
         for j in 1:Nq
             vars_nodal = get_vars_from_nodal_stack(
@@ -197,16 +197,16 @@ function get_horizontal_variance(
                 i = i,
                 j = j,
                 exclude = exclude,
-            );
-            vars_nodal_sq = Dict(vars_nodal);
-            map!(x->x.^2, values(vars_nodal_sq));
-            vars_avg = merge(+, vars_avg, vars_nodal);
-            vars_sq = merge(+, vars_sq, vars_nodal_sq);
+            )
+            vars_nodal_sq = Dict(vars_nodal)
+            map!(x -> x .^ 2, values(vars_nodal_sq))
+            vars_avg = merge(+, vars_avg, vars_nodal)
+            vars_sq = merge(+, vars_sq, vars_nodal_sq)
         end
     end
-    map!(x->(x./Nq/Nq).^2, values(vars_avg));
-    map!(x->x./Nq/Nq, values(vars_sq));
-    vars_var = merge(-, vars_sq, vars_avg);
+    map!(x -> (x ./ Nq / Nq) .^ 2, values(vars_avg))
+    map!(x -> x ./ Nq / Nq, values(vars_sq))
+    vars_var = merge(-, vars_sq, vars_avg)
     return vars_var
 end
 
