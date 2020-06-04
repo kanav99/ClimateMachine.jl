@@ -447,14 +447,18 @@ Integrating over the distribution yields:
 ```math
 \begin{equation}
 \left. \frac{d \, q_c}{dt} \right|_{accr} =
-  - n_{0}^p \, a_0^p \, v_0^p \, \chi_a^p \, \chi_v^p \, q_c \, E_{cp} \,
-    \Gamma(a_e^p + v_e^p + \Delta_a^p + \Delta_v^p + 1) \,
+  - n_{0}^p \, \Pi_{a, v}^p \, q_c \, E_{cp} \,
+    \Gamma(\Sigma_{a, v}^p + 1) \,
     \frac{1}{\lambda^p} \,
     \left( \frac{1}{r_0^p \lambda^p}
-    \right)^{a_e^p + v_e^p + \Delta_a^p + \Delta_v^p}
+    \right)^{\Sigma_{a, v}^p}
 \label{eq:accrfin}
 \end{equation}
 ```
+where:
+ - ``\Pi_{a, v}^p = a_0^p \, v_0^p \, \chi_a^p \, \chi_v^p``
+ - ``\Sigma_{a, v}^p = a_e^p + v_e^p + \Delta_a^p + \Delta_v^p``
+
 For the case of cloud liquid water and rain and cloud ice and snow collisions,
   the sink of cloud water becomes simply the source for precipitation.
 For the case of cloud liquid water and snow collisions
@@ -493,16 +497,17 @@ Integrating eq.(\ref{eq:accr_ir}) yields:
 \begin{equation}
 \left. \frac{d \, q_{rai}}{dt} \right|_{accr\_ri} =
   - \frac{1}{\rho} \, E_{ir} \, n_0^{rai} \, n_0^{ice} \,
-  m_0^{rai} \, a_0^{rai} \, v_0^{rai} \,
-  \chi_m^{rai} \, \chi_a^{rai} \, \chi_v^{rai} \,
-  \Gamma(m_e^{rai} + a_e^{rai} + v_e^{rai} +
-         \Delta_m^{rai} + \Delta_a^{rai} + \Delta_v^{rai} + 1) \,
+  \Pi_{m, a, v}^{rai}
+  \Gamma(\Sigma_{m, a, v}^{rai} + 1) \,
   \frac{1}{\lambda^{ice} \, \lambda^{rai}} \,
   \left( \frac{1}{r_0^{rai} \, \lambda^{rai}}
-  \right)^{m_e^{rai} + a_e^{rai} + v_e^{rai} +
-    \Delta_m^{rai} + \Delta_a^{rai} + \Delta_v^{rai}}
+  \right)^{\Sigma_{m, a, v}^{rai}}
 \end{equation}
 ```
+where:
+ - ``\Pi_{m, a, v}^{rai} =  m_0^{rai} \, a_0^{rai} \, v_0^{rai} \, \chi_m^{rai} \, \chi_a^{rai} \, \chi_v^{rai}``
+ - ``\Sigma_{m, a, v}^{rai} = m_e^{rai} + a_e^{rai} + v_e^{rai} + \Delta_m^{rai} + \Delta_a^{rai} + \Delta_v^{rai}``
+
 
 Collisions between rain and snow result in snow in temperatures below freezing
   and in rain in temperatures above freezing.
