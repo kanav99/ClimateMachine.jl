@@ -6,7 +6,7 @@ using DocStringExtensions
 using Printf
 
 using ClimateMachine
-ClimateMachine.init(; disable_logger = true)
+ClimateMachine.init()
 using ClimateMachine.Atmos
 using ClimateMachine.ConfigTypes
 using ClimateMachine.DGMethods.NumericalFluxes

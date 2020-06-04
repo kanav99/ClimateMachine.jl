@@ -1,5 +1,5 @@
 using ClimateMachine
-ClimateMachine.init(; disable_logger = true)
+ClimateMachine.init()
 
 using ClimateMachine.Atmos
 

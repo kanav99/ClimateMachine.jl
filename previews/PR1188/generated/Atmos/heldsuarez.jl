@@ -100,7 +100,7 @@ function init_heldsuarez!(balance_law, state, aux, coordinates, time)
 end
 nothing # hide
 
-ClimateMachine.init(; disable_logger = true)
+ClimateMachine.init()
 nothing # hide
 
 FT = Float32

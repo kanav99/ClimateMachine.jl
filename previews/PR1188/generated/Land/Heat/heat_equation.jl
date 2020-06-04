@@ -37,7 +37,7 @@ import ClimateMachine.DGMethods:
 
 FT = Float64;
 
-ClimateMachine.init(; disable_gpu = true, disable_logger = true);
+ClimateMachine.init(; disable_gpu = true);
 
 const clima_dir = dirname(dirname(pathof(ClimateMachine)));
 

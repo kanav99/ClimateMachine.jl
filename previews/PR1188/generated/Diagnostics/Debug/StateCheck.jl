@@ -5,7 +5,7 @@ using ClimateMachine
 using ClimateMachine.VariableTemplates
 using ClimateMachine.MPIStateArrays
 using ClimateMachine.StateCheck
-ClimateMachine.init(; disable_logger = true)
+ClimateMachine.init()
 FT = Float64
 
 F1 = @vars begin

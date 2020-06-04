@@ -1,7 +1,7 @@
 using MPI
 using Test
 using ClimateMachine
-ClimateMachine.init(; disable_logger = true)
+ClimateMachine.init()
 using Logging
 using ClimateMachine.Mesh.Topologies
 using ClimateMachine.Mesh.Grids
