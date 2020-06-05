@@ -1,4 +1,4 @@
-# # Single stack test based on the 3D Burgers + tracer equations
+# # Single stack tutorial based on the 3D Burgers + tracer equations
 
 # Equations solved:
 
@@ -270,16 +270,16 @@ end;
 # - Rayleigh damping is only applied in the horizontal by subtracting
 #  the vertical component of momentum from the momentum vector.
 function source!(
-    m::BurgersEquation,
+    m::BurgersEquation{FT},
     source::Vars,
     state::Vars,
     diffusive::Vars,
     aux::Vars,
     args...,
-)
-    ẑ = SVector(0, 0, 1)
+) where {FT}
+    ẑ = SVector{3, FT}(0, 0, 1)
     ρ̄ū =
-        state.ρ * SVector(
+        state.ρ * SVector{3, FT}(
             0.5 - 2 * (aux.z - m.zmax / 2)^2,
             0.5 - 2 * (aux.z - m.zmax / 2)^2,
             0.0,
@@ -609,5 +609,5 @@ export_plot(
 # with:
 
 # ```julia
-# include(joinpath("test", "Driver", "single_stack_test.jl"))
+# include(joinpath("tutorials", "Atmos", "burgers_single_stack.jl"))
 # ```
