@@ -5,9 +5,10 @@
 # ``
 # Balance law form:
 # \frac{∂ ρ}{∂ t} = - ∇ ⋅ (ρu)
-# \frac{∂ ρu}{∂ t} = - ∇ ⋅ (-μ ∇u) - ∇ ⋅ (ρu u') - γ[ (ρu-ρ̄ū) + (ρu-ρ̄ū)⋅ẑ ẑ]
+# \frac{∂ ρu}{∂ t} = - ∇ ⋅ (-μ ∇u) - ∇ ⋅ (ρu u') - γ[ (ρu-ρ̄ū) - (ρu-ρ̄ū)⋅ẑ ẑ]
 # \frac{∂ ρcT}{∂ t} = - ∇ ⋅ (-α ∇ρcT) - ∇ ⋅ (u ρcT)
 
+# Boundary conditions:
 # z_min: ρ = 1
 # z_min: ρu = 0
 # z_min: ρcT = T=T_fixed
@@ -21,16 +22,14 @@
 
 # where
 #  - `t` is time
-#  - `α` is the thermal diffusivity
+#  - `ρ` is the density
+#  - `u` is the velocity vector
 #  - `μ` is the dynamic viscosity tensor
 #  - `γ` is the Rayleigh friction frequency
 #  - `T` is the temperature
-#  - `ρ` is the density
+#  - `α` is the thermal diffusivity
 #  - `c` is the heat capacity
 #  - `ρcT` is the thermal energy
-
-# To put this in the form of ClimateMachine's [`BalanceLaw`](@ref
-# ClimateMachine.DGMethods.BalanceLaw), we'll re-write the equation as:
 
 # Solving these equations is broken down into the following steps:
 # 1) Preliminary configuration
@@ -56,7 +55,6 @@ using StaticArrays
 using LinearAlgebra: Diagonal
 
 #  - load CLIMAParameters and set up to use it:
-
 using CLIMAParameters
 struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
@@ -110,9 +108,9 @@ include(joinpath(clima_dir, "docs", "plothelpers.jl"));
 # ## Define the model
 
 # Model parameters can be stored in the particular [`BalanceLaw`](@ref
-# ClimateMachine.DGMethods.BalanceLaw), in this case, a `SingleStack`:
+# ClimateMachine.DGMethods.BalanceLaw), in this case, the `BurgersEquation`:
 
-Base.@kwdef struct SingleStack{FT} <: BalanceLaw
+Base.@kwdef struct BurgersEquation{FT} <: BalanceLaw
     "Parameters"
     param_set::AbstractParameterSet = param_set
     "Heat capacity"
@@ -137,8 +135,8 @@ Base.@kwdef struct SingleStack{FT} <: BalanceLaw
     flux_top::FT = 0.0
 end
 
-# Create an instance of the `SingleStack`:
-m = SingleStack{FT}();
+# Create an instance of the `BurgersEquation`:
+m = BurgersEquation{FT}();
 
 # This model dictates the flow control, using [Dynamic Multiple
 # Dispatch](https://en.wikipedia.org/wiki/Multiple_dispatch), for which
@@ -147,22 +145,22 @@ m = SingleStack{FT}();
 # ## Define the variables
 
 # All of the methods defined in this section were `import`ed in # [Loading
-# code](@ref) to let us provide implementations for our `SingleStack` as they
+# code](@ref) to let us provide implementations for our `BurgersEquation` as they
 # will be used by the solver.
 
-# Specify auxiliary variables for `SingleStack`
-vars_state_auxiliary(::SingleStack, FT) = @vars(z::FT, T::FT);
+# Specify auxiliary variables for `BurgersEquation`
+vars_state_auxiliary(::BurgersEquation, FT) = @vars(z::FT, T::FT);
 
 # Specify state variables, the variables solved for in the PDEs, for
-# `SingleStack`
-vars_state_conservative(::SingleStack, FT) =
+# `BurgersEquation`
+vars_state_conservative(::BurgersEquation, FT) =
     @vars(ρ::FT, ρu::SVector{3, FT}, ρcT::FT);
 
-# Specify state variables whose gradients are needed for `SingleStack`
-vars_state_gradient(::SingleStack, FT) = @vars(u::SVector{3, FT}, ρcT::FT);
+# Specify state variables whose gradients are needed for `BurgersEquation`
+vars_state_gradient(::BurgersEquation, FT) = @vars(u::SVector{3, FT}, ρcT::FT);
 
-# Specify gradient variables for `SingleStack`
-vars_state_gradient_flux(::SingleStack, FT) =
+# Specify gradient variables for `BurgersEquation`
+vars_state_gradient_flux(::BurgersEquation, FT) =
     @vars(μ∇u::SMatrix{3, 3, FT, 9}, α∇ρcT::SVector{3, FT});
 
 # ## Define the compute kernels
@@ -172,17 +170,21 @@ vars_state_gradient_flux(::SingleStack, FT) =
 # - this method is only called at `t=0`
 # - `aux.z` and `aux.T` are available here because we've specified `z` and `T`
 # in `vars_state_auxiliary`
-function init_state_auxiliary!(m::SingleStack, aux::Vars, geom::LocalGeometry)
+function init_state_auxiliary!(
+    m::BurgersEquation,
+    aux::Vars,
+    geom::LocalGeometry,
+)
     aux.z = geom.coord[3]
     aux.T = m.initialT
 end;
 
 # Specify the initial values in `state::Vars`. Note that
 # - this method is only called at `t=0`
-# - `state.ρcT`, `state.ρ`, ... are available here because we've 
-# specified `ρcT` in `vars_state_conservative`
+# - `state.ρ`, `state.ρu` and`state.ρcT` are available here because
+# we've specified `ρ`, `ρu` and `ρcT` in `vars_state_conservative`
 function init_state_conservative!(
-    m::SingleStack,
+    m::BurgersEquation,
     state::Vars,
     aux::Vars,
     coords,
@@ -208,7 +210,7 @@ end;
 # any other auxiliary methods
 function update_auxiliary_state!(
     dg::DGModel,
-    m::SingleStack,
+    m::BurgersEquation,
     Q::MPIStateArray,
     t::Real,
     elems::UnitRange,
@@ -221,7 +223,7 @@ end;
 # - `aux.T` is available here because we've specified `T` in
 # `vars_state_auxiliary`
 function heat_eq_nodal_update_aux!(
-    m::SingleStack,
+    m::BurgersEquation,
     state::Vars,
     aux::Vars,
     t::Real,
@@ -231,10 +233,10 @@ end;
 
 # Since we have second-order fluxes, we must tell `ClimateMachine` to compute
 # the gradient of `ρcT` and `u`. Here, we specify how `ρcT`, `u` are computed. Note that
-#  - `transform.ρcT` and `transform.u` are available here because we've specified `ρcT` 
+# `transform.ρcT` and `transform.u` are available here because we've specified `ρcT` 
 # and `u`in `vars_state_gradient`
 function compute_gradient_argument!(
-    m::SingleStack,
+    m::BurgersEquation,
     transform::Vars,
     state::Vars,
     aux::Vars,
@@ -246,13 +248,13 @@ end;
 
 # Specify where in `diffusive::Vars` to store the computed gradient from
 # `compute_gradient_argument!`. Note that:
-#  - e.g., `diffusive.α∇ρcT` is available here because we've specified `α∇ρcT` in
+#  - `diffusive.μ∇u` is available here because we've specified `μ∇u` in
 #  `vars_state_gradient_flux`
-#  - e.g., `∇transform.ρcT` is available here because we've specified `ρcT`  in
+#  - `∇transform.u` is available here because we've specified `u` in
 #  `vars_state_gradient`
 #  - `diffusive.μ∇u` is built using an anisotropic diffusivity tensor
 function compute_gradient_flux!(
-    m::SingleStack,
+    m::BurgersEquation,
     diffusive::Vars,
     ∇transform::Grad,
     state::Vars,
@@ -260,37 +262,38 @@ function compute_gradient_flux!(
     t::Real,
 )
     diffusive.α∇ρcT = m.α * ∇transform.ρcT
-    diffusive.μ∇u = Diagonal(@SVector [m.μh, m.μh, m.μv]) * ∇transform.u
+    diffusive.μ∇u = Diagonal(SVector(m.μh, m.μh, m.μv)) * ∇transform.u
 end;
 
 # Introduce Rayleigh friction towards a target profile as a source.
 # Note that:
 # - Rayleigh damping is only applied in the horizontal by subtracting
-#  the vertical component.
+#  the vertical component of momentum from the momentum vector.
 function source!(
-    m::SingleStack,
+    m::BurgersEquation,
     source::Vars,
     state::Vars,
     diffusive::Vars,
     aux::Vars,
     args...,
 )
-    ẑ = [0.0, 0.0, 1.0]
+    ẑ = SVector(0, 0, 1)
     ρ̄ū =
-        state.ρ *
-        [1 - 4 * (aux.z - m.zmax / 2)^2, 1 - 4 * (aux.z - m.zmax / 2)^2, 0.0] ./
-        2
+        state.ρ * SVector(
+            0.5 - 2 * (aux.z - m.zmax / 2)^2,
+            0.5 - 2 * (aux.z - m.zmax / 2)^2,
+            0.0,
+        )
     ρu_p = state.ρu - ρ̄ū
     source.ρu -= m.γ * (ρu_p - ẑ' * ρu_p * ẑ)
-
 end;
 
 # Compute advective flux.
 # Note that:
-# - `state.ρu` is available here because we've specified `α∇ρcT` in
+# - `state.ρu` is available here because we've specified `ρu` in
 # `vars_state_conservative`
 function flux_first_order!(
-    m::SingleStack,
+    m::BurgersEquation,
     flux::Grad,
     state::Vars,
     aux::Vars,
@@ -303,12 +306,12 @@ function flux_first_order!(
     flux.ρcT = u * state.ρcT
 end;
 
-# Compute diffusive flux (e.g. ``F(α, ρcT, t) = -α ∇ρcT`` in the original PDE).
+# Compute diffusive flux (e.g. ``F(μ, u, t) = -μ∇u`` in the original PDE).
 # Note that:
-# - `diffusive.α∇ρcT` is available here because we've specified `α∇ρcT` in
+# - `diffusive.μ∇u` is available here because we've specified `μ∇u` in
 # `vars_state_gradient_flux`
 function flux_second_order!(
-    m::SingleStack,
+    m::BurgersEquation,
     flux::Grad,
     state::Vars,
     diffusive::Vars,
@@ -322,15 +325,15 @@ end;
 
 # ### Boundary conditions
 
-# Second-order terms in our equations, ``∇⋅(G)`` where ``G = α∇ρcT``, are
+# Second-order terms in our equations, ``∇⋅(G)`` where ``G = μ∇u``, are
 # internally reformulated to first-order unknowns.
 # Boundary conditions must be specified for all unknowns, both first-order and
 # second-order unknowns which have been reformulated.
 
-# The boundary conditions for `ρcT` (first order unknown)
+# The boundary conditions for `ρ`, `ρu` and `ρcT` (first order unknown)
 function boundary_state!(
     nf,
-    m::SingleStack,
+    m::BurgersEquation,
     state⁺::Vars,
     aux⁺::Vars,
     n⁻,
@@ -350,11 +353,11 @@ function boundary_state!(
     end
 end;
 
-# The boundary conditions for `ρcT` are specified here for second-order
-# unknowns
+# The boundary conditions for `ρ`, `ρu` and `ρcT` are specified here for 
+# second-order unknowns
 function boundary_state!(
     nf,
-    m::SingleStack,
+    m::BurgersEquation,
     state⁺::Vars,
     diff⁺::Vars,
     aux⁺::Vars,
@@ -390,7 +393,7 @@ zmax = m.zmax;
 
 # Establish a `ClimateMachine` single stack configuration
 driver_config = ClimateMachine.SingleStackConfiguration(
-    "SingleStack",
+    "BurgersEquation",
     N_poly,
     nelem_vert,
     zmax,
@@ -426,7 +429,7 @@ dt = min(Fourier_bound, Courant_bound)
 solver_config =
     ClimateMachine.SolverConfiguration(t0, timeend, driver_config, ode_dt = dt);
 
-# ## Inspect the initial conditions for the first node
+# ## Inspect the initial conditions for a single node (e.g. the southwest node)
 
 # Let's export a plot of the initial state
 output_dir = @__DIR__;
@@ -476,13 +479,8 @@ export_plot_snapshot(
     joinpath(output_dir, "initial_condition_v.png"),
     z_label,
 );
-export_plot_snapshot(
-    z,
-    all_vars,
-    ("ρu[3]",),
-    joinpath(output_dir, "initial_condition_w.png"),
-    z_label,
-);
+
+# ## Inspect the initial conditions for the horizontal average
 
 # Horizontal statistics of variables
 state_vars_var = get_horizontal_variance(
@@ -501,19 +499,19 @@ export_plot_snapshot(
     z,
     state_vars_avg,
     ("ρu[1]",),
-    joinpath(output_dir, "initial_condition_avg.png"),
+    joinpath(output_dir, "initial_condition_avg_u.png"),
     z_label,
 );
 export_plot_snapshot(
     z,
     state_vars_var,
     ("ρu[1]",),
-    joinpath(output_dir, "initial_condition_variance.png"),
+    joinpath(output_dir, "initial_condition_variance_u.png"),
     z_label,
 );
 
-# ![](initial_condition_avg.png)
-# ![](initial_condition_variance.png)
+# ![](initial_condition_avg_u.png)
+# ![](initial_condition_variance_u.png)
 
 # # Solver hooks / callbacks
 
