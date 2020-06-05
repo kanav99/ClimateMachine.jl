@@ -155,11 +155,19 @@ driver_config = ClimateMachine.AtmosGCMConfiguration(
     model = model,
 );
 
+ode_solver_type = ClimateMachine.IMEXSolverType(
+    splitting_type = HEVISplitting(),
+    implicit_model = AtmosAcousticGravityLinearModel,
+    implicit_solver = ManyColumnLU,
+    solver_method = ARK2GiraldoKellyConstantinescu,
+)
+
 solver_config = ClimateMachine.SolverConfiguration(
     timestart,
     timeend,
     driver_config,
     Courant_number = FT(0.2),
+    ode_solver_type = ode_solver_type,
     init_on_cpu = true,
     CFL_direction = HorizontalDirection(),
     diffdir = HorizontalDirection(),
