@@ -758,16 +758,27 @@ end
         )
 
 
-        # # To test:
-        # # compute temperature from air_temperature_from_virtual_temperature
-        # # given T_virt and RH and make sure this is equal to input temperature
-        # # invert to make sure we get T back (mask for RH < 1).
-        # T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
-        # RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
+        # To test:
+        # compute temperature from air_temperature_from_virtual_temperature
+        # given T_virt and RH and make sure this is equal to input temperature
+        # invert to make sure we get T back (mask for RH < 1).
+
+        T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
+        RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
+        phase_type = PhaseEquil
+
+        T = air_temperature_from_virtual_temperature(
+            Ref(param_set),
+            T_virt,
+            p,
+            RH,
+            Ref(phase_type))
+        _R_d = FT(R_d(param_set))
+        @test all(T_virt ≈ gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)
+
         # mask = RH .< 1
         # N = 5
         # R_m = gas_constant_air.(Ref(param_set), q_pt)
-        # _R_d = FT(R_d(param_set))
         # R_m_mask = R_m[mask][1:N]
         # q_tot_mask = q_tot[mask][1:N]
         # T_mask = T[mask][1:N]
