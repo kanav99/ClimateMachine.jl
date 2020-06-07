@@ -1453,12 +1453,12 @@ function air_temperature_from_virtual_temperature(
     p::FT,
     RH::FT,
     phase_type::Type{<:ThermodynamicState},
-    tol::AbstractTolerance,
-    maxiter::Int,
+    tol::AbstractTolerance=ResidualTolerance{FT}(1e-1),
+    maxiter::Int=10,
 ) where {FT <: Real}
 
-    _T_min::FT = T_virt - 5
-    _T_max::FT = T_virt
+    _T_min::FT = T_min(param_set)
+    _T_max::FT = T_max(param_set)
     function air_temp(param_set, T_virt, T, p, RH)
         _R_d = FT(R_d(param_set))
         _R_v = FT(R_v(param_set))

@@ -763,18 +763,31 @@ end
         # given T_virt and RH and make sure this is equal to input temperature
         # invert to make sure we get T back (mask for RH < 1).
 
-        T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
-        RH = relative_humidity.(Ref(param_set), T, p, e_int, q_pt)
         phase_type = PhaseEquil
+        T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
+        RH = relative_humidity.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
 
-        T = air_temperature_from_virtual_temperature(
+        T = air_temperature_from_virtual_temperature.(
             Ref(param_set),
             T_virt,
             p,
             RH,
-            Ref(phase_type))
+            Ref(phase_type),
+            ResidualTolerance{FT}(1e-4),
+            10)
         _R_d = FT(R_d(param_set))
-        @test all(T_virt ≈ gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)
+        # @test all(T_virt ≈ gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)
+
+        # for (_T_virt, _q_pt, _T) in zip(T_virt, q_pt, T)
+        #     T_virt_rec = gas_constant_air(param_set, _q_pt) / _R_d * _T
+        #     if abs(_T_virt - T_virt_rec) > 1e-3
+        #         println("------")
+        #         @show _q_pt, _T
+        #         @show _T_virt, T_virt_rec, abs(_T_virt - T_virt_rec)
+        #     end
+        # end
+
+        @show max(abs.(T_virt - gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)...)
 
         # mask = RH .< 1
         # N = 5
