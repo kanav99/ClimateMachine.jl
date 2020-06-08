@@ -784,21 +784,20 @@ function Base.mapreduce(
     MPI.Allreduce(cpuify(locreduce), max, Q.mpicomm)
 end
 
+# `realview` and `array_device` are helpers that enable
+# testing ODESolvers and LinearSolvers without using MPIStateArrays
+# They could be potentially useful elsewhere and exported but probably need
+# better names, for example `array_device` is also defined in CUDAdrv
+
 # helpers: `array_device` and `realview`
 array_device(::Union{Array, SArray, MArray}) = CPU()
 array_device(::CuArray) = CUDA()
-array_device(s::SubArray) = array_device(parent(s))
+#array_device(s::SubArray) = array_device(parent(s))
 array_device(Q::MPIStateArray) = array_device(Q.data)
 
-# `realview` and `device` are helpers that enable
-# testing ODESolvers and LinearSolvers without using MPIStateArrays
-# They could be potentially useful elsewhere and exported but probably need
-# better names, for example `device` is also defined in CUDAdrv
-
-device(::Union{Array, SArray, MArray}) = CPU()
-device(Q::MPIStateArray) = device(Q.data)
+#array_device(::Union{Array, SArray, MArray}) = CPU()
 for (W, _) in Adapt.wrappers
-    @eval device(wrapper::$W where {AT <: Any}) = device(parent(wrapper))
+    @eval array_device(wrapper::$W where {AT <: Any}) = array_device(parent(wrapper))
 end
 
 realview(Q::Union{Array, SArray, MArray}) = Q
