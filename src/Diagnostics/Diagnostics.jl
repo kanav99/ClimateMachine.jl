@@ -38,22 +38,24 @@ using ..Writers
 using CLIMAParameters
 using CLIMAParameters.Planet: planet_radius
 struct EarthParameterSet <: AbstractEarthParameterSet end
-const param_set = EarthParameterSet()
 
 Base.@kwdef mutable struct Diagnostic_Settings
     mpicomm::MPI.Comm = MPI.COMM_WORLD
     dg::Union{Nothing, DGModel} = nothing
     Q::Union{Nothing, MPIStateArray} = nothing
     starttime::Union{Nothing, String} = nothing
+    param_set::Union{Nothing, AbstractEarthParameterSet} = nothing
     output_dir::Union{Nothing, String} = nothing
 end
 const Settings = Diagnostic_Settings()
 
 """
-    init(mpicomm, dg, Q, starttime, output_dir)
+    init(mpicomm, dg, Q, starttime, output_dir, param_set)
 
 Initialize the diagnostics collection module -- save the parameters into
 `Settings`.
+
+TODO: make `param_set` required!
 """
 function init(
     mpicomm::MPI.Comm,
@@ -61,11 +63,13 @@ function init(
     Q::MPIStateArray,
     starttime::String,
     output_dir::String,
+    param_set::AbstractEarthParameterSet = EarthParameterSet(),
 )
     Settings.mpicomm = mpicomm
     Settings.dg = dg
     Settings.Q = Q
     Settings.starttime = starttime
+    Settings.param_set = param_set
     Settings.output_dir = output_dir
 end
 

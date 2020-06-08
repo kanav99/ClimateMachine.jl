@@ -238,6 +238,7 @@ function main()
     )
 
     # aggregate diagnostics files
+    #=
     ClimateMachine.Writers.aggregate_files(
         dgn_config.groups[1].writer,
         ClimateMachine.Diagnostics.Settings.output_dir,
@@ -245,6 +246,7 @@ function main()
         dgn_config.groups[1].name,
         ClimateMachine.Diagnostics.Settings.starttime,
     )
+    =#
 end
 
 main()

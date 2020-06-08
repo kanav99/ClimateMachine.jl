@@ -20,3 +20,5 @@ function write_data(jld::JLD2Writer, filename, dims, varvals, simtime)
     end
     return nothing
 end
+
+full_name(writer::JLD2Writer, filename::String) = filename * ".jld2"
