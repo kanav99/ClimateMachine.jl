@@ -152,7 +152,8 @@ end;</code></pre><h1 id="Spatial-discretization-1"><a class="docs-heading-anchor
 ┌ Info: Establishing single stack configuration for HeatEquation
 │     precision        = Float64
 │     polynomial order = 5
-│     domain           = 1.00 m x1.00 m x1.00 m
+│     domain_min       = 0.00 m x0.00 m x0.00 m
+│     domain_max       = 1.00 m x1.00 m x1.00 m
 │     #vert elems      = 10
 │     MPI ranks        = 1
 │     min(Δ_horz)      = 0.12 m
@@ -221,9 +222,9 @@ end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1"
 │     number of steps = 36233
 └     norm(Q)         = 2.9515000000000060e+02
 ┌ Info: Update
-│     simtime =    25.60 /    40.00
+│     simtime =    19.28 /    40.00
 │     runtime = 00:01:00
-└     norm(Q) = 2.9790974488384677e+02
+└     norm(Q) = 2.9755325723134183e+02
 ┌ Info: Finished
 │     norm(Q)            = 2.9853560712934308e+02
 │     norm(Q) / norm(Q₀) = 1.0114708017257072e+00
@@ -236,4 +237,4 @@ end;</code></pre><h1 id="Solve-1"><a class="docs-heading-anchor" href="#Solve-1"
     (&quot;ρcT&quot;,),
     joinpath(output_dir, &quot;solution_vs_time.png&quot;),
     z_label,
-);</code></pre><p><img src="../solution_vs_time.png" alt/></p><p>The results look as we would expect: a fixed temperature at the bottom is resulting in heat flux that propagates up the domain. To run this file, and inspect the solution in <code>all_data</code>, include this tutorial in the Julia REPL with:</p><pre><code class="language-julia">include(joinpath(&quot;tutorials&quot;, &quot;Land&quot;, &quot;Heat&quot;, &quot;heat_equation.jl&quot;))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../Microphysics/ex_2_Kessler/">« Kessler</a><a class="docs-footer-nextpage" href="../../../Numerics/SystemSolvers/cg/">Conjugate Gradient »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 2 June 2020 17:07">Tuesday 2 June 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+);</code></pre><p><img src="../solution_vs_time.png" alt/></p><p>The results look as we would expect: a fixed temperature at the bottom is resulting in heat flux that propagates up the domain. To run this file, and inspect the solution in <code>all_data</code>, include this tutorial in the Julia REPL with:</p><pre><code class="language-julia">include(joinpath(&quot;tutorials&quot;, &quot;Land&quot;, &quot;Heat&quot;, &quot;heat_equation.jl&quot;))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../../Microphysics/ex_2_Kessler/">« Kessler</a><a class="docs-footer-nextpage" href="../../../Numerics/SystemSolvers/cg/">Conjugate Gradient »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 8 June 2020 15:59">Monday 8 June 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
