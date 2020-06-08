@@ -293,7 +293,6 @@ function atmos_gcm_default_collect(dgngrp::DiagnosticsGroup, currtime)
         )
         dfilename = joinpath(Settings.output_dir, dprefix)
         write_data(dgngrp.writer, dfilename, dims, varvals, currtime)
-        #write_data_fini(dgngrp.writer, "ln_test.nc", "time")
     end
 
     MPI.Barrier(mpicomm)

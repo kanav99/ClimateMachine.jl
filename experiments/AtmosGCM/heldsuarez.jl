@@ -236,45 +236,15 @@ function main()
         user_callbacks = (cbfilter,),
         check_euclidean_distance = true,
     )
-    # aggregate files
 
-    fnames = filter(x -> occursin(r"^Held", x), readdir("output"))
-    cd("output") do
-        # aggregate data in output into a multi-file dataset
-        NCDataset(fnames,"a"; aggdim = "time", deferopen = false) do mfds
-            varnames = keys(mfds) # all var names
-
-            dummy = mfds[varnames[5]] # one of the 4D vars to get dim info
-            dim_n = dimnames(dummy)
-            dim_s = size(dummy)
-
-            # write data to disk as combined file
-            ds = Dataset("gcm_diags_aggregated.nc","c")
-            for i = 1:ndims(dummy)
-                if dim_n[i] == "time"
-                    d_s = Inf # Inf sets UNLIMITED dimension
-                else
-                    d_s = dim_s[i]
-                end
-                defDim(ds, dim_n[i],d_s)
-            end
-
-            # save all variables, dims in the correct order: "long", "lat", "level", "time"
-            for v_n in varnames
-                vv = Array(mfds[v_n]);
-                vd = dimnames(mfds[v_n])
-                va = mfds[v_n].attrib
-                if v_n in vd
-                    defVar(ds, v_n, vv, vd, attrib = va)
-                else
-                    defVar(ds, v_n, vv, vd, attrib = va) #on Cluster
-                    #defVar(ds, v_n, permutedims(vv, [2, 3, 4, 1]), vd[[2, 3, 4, 1]], attrib = va) # on Mac
-                end
-            end
-        end
-    end
-    
-    close(ds)
+    # aggregate diagnostics files
+    ClimateMachine.Writers.aggregate_files(
+        dgn_config.groups[1].writer,
+        ClimateMachine.Diagnostics.Settings.output_dir,
+        dgn_config.groups[1].out_prefix,
+        dgn_config.groups[1].name,
+        ClimateMachine.Diagnostics.Settings.starttime,
+    )
 end
 
 main()
