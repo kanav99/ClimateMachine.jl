@@ -759,13 +759,35 @@ end
 
 
         # To test:
+        # Test relative humidity and virtual temperature functions:
         # compute temperature from air_temperature_from_virtual_temperature
         # given T_virt and RH and make sure this is equal to input temperature
         # invert to make sure we get T back (mask for RH < 1).
 
+        profiles = PhaseEquilProfiles(param_set, FT)
+        @unpack_fields profiles T p RS e_int ρ θ_liq_ice q_tot q_liq q_ice q_pt RH
+
         phase_type = PhaseEquil
+        _R_d = FT(R_d(param_set))
         T_virt = virtual_temperature.(Ref(param_set), T, ρ, q_pt)
-        RH = relative_humidity.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+        @test all(T_virt ≈ gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)
+
+        q_sat = q_vap_saturation.(Ref(param_set), T, ρ, phase_type)
+        q_pt_sat = PhasePartition.(q_sat)
+
+        # Why are RH ≠ 1 here?
+        RH = relative_humidity.(Ref(param_set), T, p, Ref(phase_type), q_pt_sat)
+        @test all(RH .≈ 1)
+        @show RH[1:20]
+        @show T[1:20]
+
+        q_pt_sat = PhasePartition.(q_sat .* 0)
+        RH = relative_humidity.(Ref(param_set), T, p, Ref(phase_type), q_pt_sat)
+        @test all(RH .≈ 0)
+
+
+        RH = relative_humidity.(Ref(param_set), T, p, Ref(phase_type), q_pt)
+        RH_mask = RH .<= 1
 
         T = air_temperature_from_virtual_temperature.(
             Ref(param_set),
@@ -775,60 +797,14 @@ end
             Ref(phase_type),
             ResidualTolerance{FT}(1e-4),
             10)
-        _R_d = FT(R_d(param_set))
-        # @test all(T_virt ≈ gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)
 
-        # for (_T_virt, _q_pt, _T) in zip(T_virt, q_pt, T)
-        #     T_virt_rec = gas_constant_air(param_set, _q_pt) / _R_d * _T
-        #     if abs(_T_virt - T_virt_rec) > 1e-3
-        #         println("------")
-        #         @show _q_pt, _T
-        #         @show _T_virt, T_virt_rec, abs(_T_virt - T_virt_rec)
-        #     end
-        # end
-
-        @show max(abs.(T_virt - gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T)...)
-
-        # mask = RH .< 1
-        # N = 5
-        # R_m = gas_constant_air.(Ref(param_set), q_pt)
-        # R_m_mask = R_m[mask][1:N]
-        # q_tot_mask = q_tot[mask][1:N]
-        # T_mask = T[mask][1:N]
-        # T_virt_mask = T_virt[mask][1:N]
-        # p_mask = p[mask][1:N]
-        # RH_mask = RH[mask][1:N]
-        # @show R_m_mask / _R_d .* T_mask
-        # @show R_m_mask / _R_d
-        # @show T_virt_mask
-        # @show T_mask
-        # @show q_tot_mask
-        # @show p_mask
-        # @show RH_mask
-        # # TODO: Add consistency test for `air_temperature_from_virtual_temperature`:
-
-        # phase_type = PhaseEquil
-        # q_vap_mask = vapor_specific_humidity.(Ref(param_set), T_mask, p_mask, RH_mask, Ref(phase_type))
-        # println("---------")
-        # @show q_tot_mask
-        # @show q_vap_mask
-        # println("---------")
-        # @test all(isapprox.(q_tot_mask, q_vap_mask, rtol=rtol))
-
-
-        # T_from_virt = MT.air_temperature_from_virtual_temperature.(
-        #     Ref(param_set),
-        #     T_virt_mask,
-        #     p_mask,
-        #     RH_mask,
-        #     Ref(ResidualTolerance(FT(1e-2))),
-        #     Ref(10)
-        #     )
-
-        # # @test all(T_mask .≈ T_from_virt)
-        # @show T_from_virt
-        # @show T_mask
-        # @show T_mask .- T_from_virt
+        T_virt_rec = gas_constant_air.(Ref(param_set), q_pt) ./ _R_d .* T
+        mask_err = abs.(T_virt_rec .- T_virt) .> 0.1
+        @show RH[mask_err][1:10]
+        @show T[mask_err][1:10]
+        @show T_virt_rec[mask_err][1:10]
+        @show T_virt[mask_err][1:10]
+        @show max(abs.(T_virt[RH_mask] - T_virt_rec[RH_mask])...)
     end
 
 end

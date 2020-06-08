@@ -157,7 +157,7 @@ function PhaseDryProfiles(
     θ_liq_ice = liquid_ice_pottemp.(Ref(param_set), T, ρ, q_pt)
     q_liq = getproperty.(q_pt, :liq)
     q_ice = getproperty.(q_pt, :ice)
-    RH = relative_humidity.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+    RH = relative_humidity.(Ref(param_set), T, p, Ref(phase_type), q_pt)
 
     # TODO: Update this once a super saturation method exists
     # SS = super_saturation.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
@@ -231,7 +231,7 @@ function PhaseEquilProfiles(
     θ_liq_ice = liquid_ice_pottemp.(Ref(param_set), T, ρ, q_pt)
     q_liq = getproperty.(q_pt, :liq)
     q_ice = getproperty.(q_pt, :ice)
-    RH = relative_humidity.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
+    RH = relative_humidity.(Ref(param_set), T, p, Ref(phase_type), q_pt)
 
     # TODO: Update this once a super saturation method exists
     # SS = super_saturation.(Ref(param_set), T, p, e_int, Ref(phase_type), q_pt)
