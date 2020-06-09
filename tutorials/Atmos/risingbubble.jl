@@ -340,7 +340,7 @@ function main()
     dgn_config = config_diagnostics(driver_config)
 
     # User defined filter (TMAR positivity preserving filter)
-    cbtmarfilter = GenericCallbacks.EveryXSimulationSteps(1) do (init = false)
+    cbtmarfilter = GenericCallbacks.EveryXSimulationSteps(1) do
         Filters.apply!(solver_config.Q, 6, solver_config.dg.grid, TMARFilter())
         nothing
     end

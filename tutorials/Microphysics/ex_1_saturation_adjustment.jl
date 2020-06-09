@@ -216,7 +216,7 @@ function main()
     model = driver_config.bl
     step = [0]
     cbvtk =
-        GenericCallbacks.EveryXSimulationSteps(output_freq) do (init = false)
+        GenericCallbacks.EveryXSimulationSteps(output_freq) do
             out_dirname = @sprintf(
                 "new_ex_1_mpirank%04d_step%04d",
                 MPI.Comm_rank(mpicomm),

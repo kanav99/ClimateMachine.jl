@@ -338,7 +338,7 @@ function main()
 
     # filter out negative values
     cb_tmar_filter =
-        GenericCallbacks.EveryXSimulationSteps(filter_freq) do (init = false)
+        GenericCallbacks.EveryXSimulationSteps(filter_freq) do
             Filters.apply!(
                 solver_config.Q,
                 (ρq_liq_ind[1], ρq_ice_ind[1], ρq_rai_ind[1]),
@@ -359,7 +359,7 @@ function main()
 
     step = [0]
     cb_vtk =
-        GenericCallbacks.EveryXSimulationSteps(output_freq) do (init = false)
+        GenericCallbacks.EveryXSimulationSteps(output_freq) do
             out_dirname = @sprintf(
                 "new_ex_2_mpirank%04d_step%04d",
                 MPI.Comm_rank(mpicomm),

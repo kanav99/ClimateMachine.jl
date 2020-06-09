@@ -512,7 +512,7 @@ function main()
     )
     dgn_config = config_diagnostics(driver_config)
 
-    cbtmarfilter = GenericCallbacks.EveryXSimulationSteps(1) do (init = false)
+    cbtmarfilter = GenericCallbacks.EveryXSimulationSteps(1) do
         Filters.apply!(solver_config.Q, 6, solver_config.dg.grid, TMARFilter())
         nothing
     end
@@ -529,7 +529,7 @@ function main()
     Σρ₀ = sum(ρ₀ .* M)
     Σρe₀ = sum(ρe₀ .* M)
     cb_check_cons =
-        GenericCallbacks.EveryXSimulationSteps(3000) do (init = false)
+        GenericCallbacks.EveryXSimulationSteps(3000) do
             Q = solver_config.Q
             δρ = (sum(Q.ρ .* M) - Σρ₀) / Σρ₀
             δρe = (sum(Q.ρe .* M) .- Σρe₀) ./ Σρe₀

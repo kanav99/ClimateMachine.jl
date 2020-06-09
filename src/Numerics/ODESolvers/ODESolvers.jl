@@ -93,7 +93,7 @@ A series of optional callback functions can be specified using the tuple
 function solve!(
     Q,
     solver::AbstractODESolver,
-    p = nothing;
+    param = nothing;
     timeend::Real = Inf,
     adjustfinalstep = true,
     numberofsteps::Integer = 0,
@@ -107,11 +107,8 @@ function solve!(
     t0 = gettime(solver)
 
     # Loop through an initialize callbacks (if they need it)
-    foreach(callbacks) do cb
-        try
-            cb(true)
-        catch
-        end
+    foreach(callbacks) do callback
+        initialize!(callback, solver, Q, param, t0)
     end
 
     step = 0
@@ -122,7 +119,7 @@ function solve!(
         time = general_dostep!(
             Q,
             solver,
-            p,
+            param,
             timeend;
             adjustfinalstep = adjustfinalstep,
         )
@@ -135,10 +132,10 @@ function solve!(
         for (i, cb) in enumerate(callbacks)
             # FIXME: Consider whether callbacks need anything, or if function closure
             #        can be used for everything
-            thisretval = cb()
+            thisretval = cb(solver, Q, param, t)
             thisretval = (thisretval == nothing) ? 0 : thisretval
             !(thisretval in (0, 1, 2)) &&
-            error("callback #$(i) returned invalid value. It should return either:
+            error("callback #$(i) returned invalid value $(thisretval). It should return either:
                   `nothing` (continue time stepping)
                   `0`       (continue time stepping)
                   `1`       (stop time stepping after all callbacks)
