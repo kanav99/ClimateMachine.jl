@@ -5,7 +5,7 @@ using ClimateMachine.Mesh.Topologies:
 using ClimateMachine.Mesh.Grids:
     DiscontinuousSpectralElementGrid, VerticalDirection
 using ClimateMachine.Mesh.Filters
-using ClimateMachine.DGMethods: DGModel, init_ode_state, FilterStateConservative
+using ClimateMachine.DGMethods: DGModel, init_ode_state
 using ClimateMachine.DGMethods.NumericalFluxes:
     RusanovNumericalFlux,
     CentralNumericalFluxGradient,
@@ -169,13 +169,7 @@ function run(
     filterorder = 18
     filter = ExponentialFilter(grid, 0, filterorder)
     cbfilter = EveryXSimulationSteps(1) do
-        Filters.apply!(
-            Q,
-            FilterStateConservative(model),
-            grid,
-            filter,
-            direction = VerticalDirection(),
-        )
+        Filters.apply!(Q, :, grid, filter, direction = VerticalDirection())
         nothing
     end
 

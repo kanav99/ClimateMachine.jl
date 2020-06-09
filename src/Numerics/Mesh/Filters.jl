@@ -6,11 +6,11 @@ using StaticArrays
 using ..Grids
 using ..Grids: Direction, EveryDirection, HorizontalDirection, VerticalDirection
 
-using ...VariableTemplates: @vars, varsize, Vars
+using ...MPIStateArrays
+using ...VariableTemplates: @vars, varsize, Vars, varsindices
 
 export AbstractSpectralFilter, AbstractFilter
 export ExponentialFilter, CutoffFilter, TMARFilter
-export FilterIndices
 
 abstract type AbstractFilter end
 abstract type AbstractSpectralFilter <: AbstractFilter end
@@ -24,28 +24,12 @@ will act on
 abstract type AbstractFilterTarget end
 
 """
-    vars_filter_state(::AbstractFilterTarget, FT)
-
-A tuple of symbols containing all state variables
-that are passed to the filter given a float type `FT`
-"""
-function vars_filter_state end
-"""
-    vars_filter_filtered(::AbstractFilterTarget, FT)
+    vars_filtered(::AbstractFilterTarget, FT)
 
 A tuple of symbols containing variables that the filter
 will act on given a float type `FT`
 """
-function vars_filter_filtered end
-
-"""
-    vars_filter_auxiliary(::AbstractFilterTarget, FT)
-
-A tuple of symbols containing the auxiliary variables that
-may be needed to compute the filter argument/result given
-a float type `FT`
-"""
-vars_filter_auxiliary(::AbstractFilterTarget, FT) = @vars()
+function vars_filtered end
 
 """
     compute_filter_argument!(::AbstractFilterTarget,
@@ -68,12 +52,8 @@ Compute filter result `state` based on the filtered state
 """
 function compute_filter_result! end
 
-number_filter_state(t::AbstractFilterTarget, FT) =
-    varsize(vars_filter_state(t, FT))
-number_filter_filtered(t::AbstractFilterTarget, FT) =
-    varsize(vars_filter_filtered(t, FT))
-number_filter_auxiliary(t::AbstractFilterTarget, FT) =
-    varsize(vars_filter_auxiliary(t, FT))
+number_state_filtered(t::AbstractFilterTarget, FT) =
+    varsize(vars_filtered(t, FT))
 
 """
     FilterIndices(I)
@@ -87,14 +67,12 @@ FiltersIndices(1:3)
 FiltersIndices(1, 3, 5)
 ```
 """
-struct FilterIndices{I, N} <: AbstractFilterTarget
-    FilterIndices(I::Integer...) = new{I, maximum(I)}()
-    FilterIndices(I::AbstractRange) = new{I, maximum(I)}()
+struct FilterIndices{I} <: AbstractFilterTarget
+    FilterIndices(I::Integer...) = new{I}()
+    FilterIndices(I::AbstractRange) = new{I}()
 end
-vars_filter_filtered(::FilterIndices{I}, FT) where {I} =
+vars_filtered(::FilterIndices{I}, FT) where {I} =
     @vars(_::SVector{length(I), FT})
-vars_filter_state(::FilterIndices{I, N}, FT) where {I, N} =
-    @vars(_::SVector{N, FT})
 
 function compute_filter_argument!(
     ::FilterIndices{I},
@@ -276,6 +254,8 @@ function apply!(
     event = kernel_apply_filter!(device, (Nq, Nq, Nqk))(
         Val(dim),
         Val(N),
+        Val(vars(Q)),
+        Val(isnothing(state_auxiliary) ? nothing : vars(state_auxiliary)),
         direction,
         Q.data,
         isnothing(state_auxiliary) ? nothing : state_auxiliary.data,
@@ -287,6 +267,7 @@ function apply!(
     wait(device, event)
 end
 
+
 """
     apply!(Q, target, grid::DiscontinuousSpectralElementGrid, ::TMARFilter)
 
@@ -296,7 +277,7 @@ while keeping the element average the same.
 """
 function apply!(
     Q,
-    target::FilterIndices,
+    target::AbstractFilterTarget,
     grid::DiscontinuousSpectralElementGrid,
     ::TMARFilter,
 )
@@ -325,6 +306,34 @@ function apply!(
     wait(device, event)
 end
 
+function apply!(
+    Q,
+    indices::Union{Colon, AbstractRange, Tuple{Vararg{Integer}}},
+    grid::DiscontinuousSpectralElementGrid,
+    filter::AbstractFilter;
+    kwargs...,
+)
+    if indices isa Colon
+        indices = 1:size(Q, 2)
+    end
+    apply!(Q, FilterIndices(indices...), grid, filter; kwargs...)
+end
+
+function apply!(
+    Q,
+    vs::Tuple,
+    grid::DiscontinuousSpectralElementGrid,
+    filter::AbstractFilter;
+    kwargs...,
+)
+    apply!(
+        Q,
+        FilterIndices(varsindices(vars(Q), vs)...),
+        grid,
+        filter;
+        kwargs...,
+    )
+end
 
 const _M = Grids._M
 
@@ -342,12 +351,14 @@ horizontal and/or vertical reference directions.
 @kernel function kernel_apply_filter!(
     ::Val{dim},
     ::Val{N},
+    ::Val{vars_Q},
+    ::Val{vars_state_auxiliary},
     direction,
     Q,
     state_auxiliary,
     target::AbstractFilterTarget,
     filtermatrix,
-) where {dim, N}
+) where {dim, N, vars_Q, vars_state_auxiliary}
     @uniform begin
         FT = eltype(Q)
 
@@ -367,9 +378,10 @@ horizontal and/or vertical reference directions.
             filterinξ3 = dim == 2 ? false : true
         end
 
-        nstates = number_filter_state(target, FT)
-        nfilterstates = number_filter_filtered(target, FT)
-        nfilteraux = number_filter_auxiliary(target, FT)
+        nstates = varsize(vars_Q)
+        nfilterstates = number_state_filtered(target, FT)
+        nfilteraux =
+            isnothing(state_auxiliary) ? 0 : varsize(vars_state_auxiliary)
 
         # ugly workaround around problems with @private
         # hopefully will be soon fixed in KA
@@ -400,11 +412,12 @@ horizontal and/or vertical reference directions.
         end
 
         fill!(l_Qfiltered2, -zero(FT))
+
         compute_filter_argument!(
             target,
-            Vars{vars_filter_filtered(target, FT)}(l_Qfiltered2),
-            Vars{vars_filter_state(target, FT)}(l_Q[:]),
-            Vars{vars_filter_auxiliary(target, FT)}(l_aux[:]),
+            Vars{vars_filtered(target, FT)}(l_Qfiltered2),
+            Vars{vars_Q}(l_Q[:]),
+            Vars{vars_state_auxiliary}(l_aux[:]),
         )
 
         @unroll for fs in 1:nfilterstates
@@ -464,9 +477,9 @@ horizontal and/or vertical reference directions.
 
         compute_filter_result!(
             target,
-            Vars{vars_filter_state(target, FT)}(l_Q2),
-            Vars{vars_filter_filtered(target, FT)}(l_Qfiltered[:]),
-            Vars{vars_filter_auxiliary(target, FT)}(l_aux[:]),
+            Vars{vars_Q}(l_Q2),
+            Vars{vars_filtered(target, FT)}(l_Qfiltered[:]),
+            Vars{vars_state_auxiliary}(l_aux[:]),
         )
 
         # Store result
@@ -493,7 +506,7 @@ end
         Nq = N + 1
         Nqj = dim == 2 ? 1 : Nq
 
-        nfilterstates = number_filter_state(target, FT)
+        nfilterstates = number_state_filtered(target, FT)
         nelemperblock = 1
     end
 

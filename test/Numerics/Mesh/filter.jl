@@ -183,35 +183,27 @@ end
                     state_gradient_flux = nothing,
                 )
 
-                Q = ClimateMachine.DGMethods.init_ode_state(dg, nothing, dim)
-                ClimateMachine.Mesh.Filters.apply!(
-                    Q,
-                    ClimateMachine.Mesh.Filters.FilterIndices(1, 3),
-                    grid,
-                    filter,
-                    direction = direction(),
-                )
+                @testset for target in ((1, 3), (:q1, :q3))
+                    Q = ClimateMachine.DGMethods.init_ode_state(
+                        dg,
+                        nothing,
+                        dim,
+                    )
+                    ClimateMachine.Mesh.Filters.apply!(
+                        Q,
+                        target,
+                        grid,
+                        filter,
+                        direction = direction(),
+                    )
 
-                P = ClimateMachine.DGMethods.init_ode_state(
-                    dg,
-                    direction(),
-                    dim,
-                )
-                @test Array(Q.data) ≈ Array(P.data)
-
-                Q = ClimateMachine.DGMethods.init_ode_state(dg, nothing, dim)
-                ClimateMachine.Mesh.Filters.apply!(
-                    Q,
-                    ClimateMachine.DGMethods.FilterStateConservative(
-                        model,
-                        :q1,
-                        :q3,
-                    ),
-                    grid,
-                    filter,
-                    direction = direction(),
-                )
-                @test Array(Q.data) ≈ Array(P.data)
+                    P = ClimateMachine.DGMethods.init_ode_state(
+                        dg,
+                        direction(),
+                        dim,
+                    )
+                    @test Array(Q.data) ≈ Array(P.data)
+                end
             end
         end
     end
@@ -262,39 +254,24 @@ end
                 state_gradient_flux = nothing,
             )
 
-            Q = ClimateMachine.DGMethods.init_ode_state(dg)
+            @testset for target in ((1,), (:q,), :)
+                Q = ClimateMachine.DGMethods.init_ode_state(dg)
 
-            initialsumQ = weightedsum(Q)
-            @test minimum(Q.realdata) < 0
+                initialsumQ = weightedsum(Q)
+                @test minimum(Q.realdata) < 0
 
-            ClimateMachine.Mesh.Filters.apply!(
-                Q,
-                ClimateMachine.Mesh.Filters.FilterIndices(1),
-                grid,
-                ClimateMachine.Mesh.Filters.TMARFilter(),
-            )
+                ClimateMachine.Mesh.Filters.apply!(
+                    Q,
+                    target,
+                    grid,
+                    ClimateMachine.Mesh.Filters.TMARFilter(),
+                )
 
-            sumQ = weightedsum(Q)
+                sumQ = weightedsum(Q)
 
-            @test minimum(Q.realdata) >= 0
-            @test isapprox(initialsumQ, sumQ; rtol = 10 * eps(FT))
-
-            Q = ClimateMachine.DGMethods.init_ode_state(dg)
-
-            initialsumQ = weightedsum(Q)
-            @test minimum(Q.realdata) < 0
-
-            ClimateMachine.Mesh.Filters.apply!(
-                Q,
-                ClimateMachine.DGMethods.FilterStateConservative(model),
-                grid,
-                ClimateMachine.Mesh.Filters.TMARFilter(),
-            )
-
-            sumQ = weightedsum(Q)
-
-            @test minimum(Q.realdata) >= 0
-            @test isapprox(initialsumQ, sumQ; rtol = 10 * eps(FT))
+                @test minimum(Q.realdata) >= 0
+                @test isapprox(initialsumQ, sumQ; rtol = 10 * eps(FT))
+            end
         end
     end
 end

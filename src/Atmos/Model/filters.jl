@@ -2,9 +2,7 @@ export AtmosFilterPerturbations
 
 import ..Mesh.Filters:
     AbstractFilterTarget,
-    vars_filter_state,
-    vars_filter_filtered,
-    vars_filter_auxiliary,
+    vars_filtered,
     compute_filter_argument!,
     compute_filter_result!
 
@@ -12,12 +10,8 @@ struct AtmosFilterPerturbations{M} <: AbstractFilterTarget
     atmos::M
 end
 
-vars_filter_state(target::AtmosFilterPerturbations, FT) =
+vars_filtered(target::AtmosFilterPerturbations, FT) =
     vars_state_conservative(target.atmos, FT)
-vars_filter_filtered(target::AtmosFilterPerturbations, FT) =
-    vars_state_conservative(target.atmos, FT)
-vars_filter_auxiliary(target::AtmosFilterPerturbations, FT) =
-    vars_state_auxiliary(target.atmos, FT)
 
 function compute_filter_argument!(
     ::AtmosFilterPerturbations,
