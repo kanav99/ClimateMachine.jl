@@ -329,7 +329,7 @@ function main()
         GenericCallbacks.EveryXSimulationSteps(filter_freq) do (init = false)
             Filters.apply!(
                 solver_config.Q,
-                FilterStateConservative(model, :ρq_liq, :ρq_ice, :ρq_rai),
+                (:ρq_liq, :ρq_ice, :ρq_rai),
                 solver_config.dg.grid,
                 TMARFilter(),
             )
