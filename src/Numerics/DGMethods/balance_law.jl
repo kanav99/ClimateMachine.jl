@@ -13,7 +13,6 @@ function calculate_dt(dg, model, Q, Courant_number, t, direction)
     return Courant_number / CFL
 end
 
-
 function create_conservative_state(balance_law::BalanceLaw, grid)
     topology = grid.topology
     # FIXME: Remove after updating CUDA

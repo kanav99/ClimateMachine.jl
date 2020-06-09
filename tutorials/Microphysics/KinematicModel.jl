@@ -33,6 +33,7 @@ using ClimateMachine.DGMethods.NumericalFluxes
 using ClimateMachine.Grids
 using ClimateMachine.GenericCallbacks
 using ClimateMachine.Mesh.Filters
+using ClimateMachine.DGMethods: FilterStateConservative
 using ClimateMachine.Mesh.Topologies
 using ClimateMachine.Thermodynamics:
     gas_constants,
