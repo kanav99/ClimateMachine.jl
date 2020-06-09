@@ -159,7 +159,7 @@ function atmos_gcm_default_init(dgngrp::DiagnosticsGroup, currtime)
     for varname in varnames
         var = Variables[varname]
         vars[varname] = (
-            tuple(collect(keys(dims))),
+            tuple(collect(keys(dims))...),
             FT,
             OrderedDict(
                 "units" => var.units,
