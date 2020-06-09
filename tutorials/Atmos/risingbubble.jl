@@ -120,6 +120,7 @@ using CLIMAParameters.Planet: R_d, cp_d, cv_d, MSLP, grav
 struct EarthParameterSet <: AbstractEarthParameterSet end
 const param_set = EarthParameterSet()
 
+using OrdinaryDiffEq
 # ## [Initial Conditions](@id init)
 # This example of a rising thermal bubble can be classified as an initial value
 # problem. We must (at the very least) assign values for the initial variables
@@ -212,11 +213,11 @@ function config_risingbubble(FT, N, resolution, xmax, ymax, zmax)
     # The 1D-IMEX method is less appropriate for the problem given the current
     # mesh aspect ratio (1:1).
     ode_solver = ClimateMachine.ExplicitSolverType(
-        solver_method = LSRK144NiegemannDiehlBusch,
+        solver_method = (F,Q;dt = 0,t0 = 0) -> DiffEqJLSolver(F, NDBLSRK144(;williamson_condition=false), Q; t0 = t0, dt = dt, adaptive = false, calck = false),
     )
     # If the user prefers a multi-rate explicit time integrator,
-    # the ode_solver above can be replaced with 
-    # 
+    # the ode_solver above can be replaced with
+    #
     # `ode_solver = ClimateMachine.MultirateSolverType(
     #    fast_model = AtmosAcousticGravityLinearModel,
     #    slow_method = LSRK144NiegemannDiehlBusch,
