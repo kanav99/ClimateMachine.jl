@@ -28,6 +28,8 @@ if generate_tutorials
                 "Saturation adjustment" =>
                     "Microphysics/ex_1_saturation_adjustment.jl",
                 "Kessler" => "Microphysics/ex_2_Kessler.jl",
+                "Flow in Single Element Stack" =>
+                    "Atmos/burgers_single_stack.jl",
             ],
         ],
         "Ocean" => [],
@@ -65,6 +67,7 @@ if generate_tutorials
         "Atmos/dry_rayleigh_benard.jl",               # takes too long
         "Atmos/heldsuarez.jl",                        # broken
         "Atmos/risingbubble.jl",                      # broken
+        "Atmos/burgers_single_stack.jl",              # too long
         "Numerics/DGMethods/nonnegative.jl",          # broken
         "Microphysics/ex_1_saturation_adjustment.jl", # too long
         "Microphysics/ex_2_Kessler.jl",               # too long
