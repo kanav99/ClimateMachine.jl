@@ -163,7 +163,7 @@ cbfilter = GenericCallbacks.EveryXSimulationSteps(1) do
         1:size(solver_config.Q, 2),
         solver_config.dg.grid,
         filter,
-    );
+    )
 end;</code></pre><h2 id="Setup-diagnostic-output-1"><a class="docs-heading-anchor" href="#Setup-diagnostic-output-1">Setup diagnostic output</a><a class="docs-heading-anchor-permalink" href="#Setup-diagnostic-output-1" title="Permalink"></a></h2><p>Choose frequency and resolution of output, and a diagnostics group (dgngrp) which defines output variables. This needs to be defined in <a href="../../../APIs/Diagnostics/Diagnostics/#ClimateMachine.Diagnostics"><code>Diagnostics</code></a>.</p><pre><code class="language-julia">interval = &quot;1000steps&quot;;
 _planet_radius = FT(planet_radius(param_set));
 info = driver_config.config_info;
@@ -192,11 +192,11 @@ dgn_config = setup_dump_state_and_aux_diagnostics(
 │     dt              = 1.21690e+02
 │     timeend         =  8640.00
 │     number of steps = 71
-└     norm(Q)         = 7.7110450323456000e+13
+└     norm(Q)         = 7.7110458712064000e+13
 ┌ Info: Finished
-│     norm(Q)            = 7.6945941331968000e+13
-│     norm(Q) / norm(Q₀) = 9.9786657094955444e-01
-└     norm(Q) - norm(Q₀) = -1.6450899148800000e+11
+│     norm(Q)            = 7.6946654363648000e+13
+│     norm(Q) / norm(Q₀) = 9.9787569046020508e-01
+└     norm(Q) - norm(Q₀) = -1.6380434841600000e+11
 ┌ Info: Euclidean distance
-│     norm(Q - Qe)            = 1.8532156047360000e+12
-└     norm(Q - Qe) / norm(Qe) = 2.4033490568399429e-02</code></pre><h2 id="References-1"><a class="docs-heading-anchor" href="#References-1">References</a><a class="docs-heading-anchor-permalink" href="#References-1" title="Permalink"></a></h2><ul><li>Held, I.M. and M.J. Suarez, 1994: A Proposal for the Intercomparison</li></ul><p>the Dynamical Cores of Atmospheric General Circulation Models. Bull. # Amer. Meteor. Soc., 75, 1825–1830, https://doi.org/10.1175/1520-0477(1994)075&lt;1825:APFTIO&gt;2.0.CO;2</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../dry_rayleigh_benard/">« Dry Rayleigh Bernard</a><a class="docs-footer-nextpage" href="../risingbubble/">Rising Thermal Bubble »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 9 June 2020 02:36">Tuesday 9 June 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+│     norm(Q - Qe)            = 1.8535978106880000e+12
+└     norm(Q - Qe) / norm(Qe) = 2.4038445204496384e-02</code></pre><h2 id="References-1"><a class="docs-heading-anchor" href="#References-1">References</a><a class="docs-heading-anchor-permalink" href="#References-1" title="Permalink"></a></h2><ul><li>Held, I.M. and M.J. Suarez, 1994: A Proposal for the Intercomparison</li></ul><p>the Dynamical Cores of Atmospheric General Circulation Models. Bull. # Amer. Meteor. Soc., 75, 1825–1830, https://doi.org/10.1175/1520-0477(1994)075&lt;1825:APFTIO&gt;2.0.CO;2</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../dry_rayleigh_benard/">« Dry Rayleigh Bernard</a><a class="docs-footer-nextpage" href="../risingbubble/">Rising Thermal Bubble »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 9 June 2020 04:07">Tuesday 9 June 2020</span>. Using Julia version 1.3.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
